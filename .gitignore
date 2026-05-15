@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+build/
+*.so
+
+# Local tools and editors
+.agents/
+.codex/
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Local data
+*.db
+*.sqlite
