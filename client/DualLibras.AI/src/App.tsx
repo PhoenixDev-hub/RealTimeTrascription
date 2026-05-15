@@ -32,6 +32,13 @@ function App() {
 
   const textoParaLibras = (texto || textoFinal).trim()
   const textoExibido = textoParaLibras || 'Aguardando fala...'
+  const statusLegenda = temErro
+    ? 'Erro na transcrição'
+    : traducaoFinal
+      ? 'Legenda final'
+      : textoParaLibras
+        ? 'Legenda ao vivo'
+        : 'Pronto para ouvir'
 
   return (
     <main className="app-shell">
@@ -49,18 +56,31 @@ function App() {
         </div>
       </section>
 
-      <section className="caption-area" aria-label="Legenda da transcrição">
-        <p
-          id={CONTENT_ID}
-          className="caption-text"
-          data-error={temErro}
-          data-empty={!textoParaLibras}
-          data-vlibras-text
-          lang="pt-BR"
-          aria-live="polite"
-        >
-          {textoExibido}
-        </p>
+      <section
+        className="caption-area"
+        aria-label="Legenda da transcrição"
+        data-connected={conectado}
+        data-final={traducaoFinal}
+      >
+        <div className="caption-frame">
+          <div className="caption-header" aria-hidden="true">
+            <span>{statusLegenda}</span>
+            <span>{conectado ? 'Enviando para Libras' : 'Sem conexão'}</span>
+          </div>
+
+          <p
+            id={CONTENT_ID}
+            className="caption-text"
+            data-error={temErro}
+            data-empty={!textoParaLibras}
+            data-vlibras-text
+            tabIndex={-1}
+            lang="pt-BR"
+            aria-live="polite"
+          >
+            {textoExibido}
+          </p>
+        </div>
       </section>
     </main>
   )
