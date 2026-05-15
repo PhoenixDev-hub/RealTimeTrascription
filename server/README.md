@@ -127,7 +127,3 @@ Os logs são exibidos no terminal do backend, mostrando:
 ### VLibras não aparece
 - Verifique se há conexão com a internet
 - O widget VLibras é carregado do site oficial `vlibras.gov.br`
-
-## Licença
-
-Este projeto é distribuído sob a licença MIT.
