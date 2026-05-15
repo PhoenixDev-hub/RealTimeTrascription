@@ -4,20 +4,20 @@ Interface web do projeto DualLibras.AI, construída com **React + TypeScript + V
 
 ---
 
-## 🧰 Requisitos
+## Requisitos
 
 - Node.js 18+
 - npm
 
 ---
 
-## 🚀 Instalação
+## Instalação
 
 ```bash
 npm install
 ```
 
-## ▶️ Rodando em desenvolvimento
+## Rodando em desenvolvimento
 
 ```bash
 npm run dev
@@ -29,7 +29,7 @@ Acesse em: [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 src/
@@ -42,18 +42,18 @@ src/
 
 ---
 
-## 🔌 Plugins Vite disponíveis
+## Plugins Vite disponíveis
 
 - [`@vitejs/plugin-react`](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) — usa [Oxc](https://oxc.rs/)
 - [`@vitejs/plugin-react-swc`](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) — usa [SWC](https://swc.rs/)
 
-## ⚛️ React Compiler
+## React Compiler
 
 O React Compiler não vem ativado por padrão devido ao impacto na performance de dev e build. Para habilitá-lo, consulte a [documentação oficial](https://react.dev/learn/react-compiler/installation).
 
 ---
 
-## 🛠️ ESLint
+## ESLint
 
 Para habilitar regras com verificação de tipos em produção, atualize o `eslint.config.js`:
 
