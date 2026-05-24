@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
@@ -12,26 +13,37 @@ import Configure
 import sounddevice as sd
 import websockets
 
-SAMPLE_RATE = int(os.getenv("AUDIO_SAMPLE_RATE", "16000"))
-CHANNELS = int(os.getenv("AUDIO_CHANNELS", "1"))
-SAMPLE_WIDTH_BYTES = 2
-CHUNK_SIZE = int(os.getenv("AUDIO_CHUNK_SIZE", "3200"))
-BLOCK_SAMPLES = max(1, CHUNK_SIZE // (CHANNELS * SAMPLE_WIDTH_BYTES))
-AUDIO_QUEUE_MAX_SIZE = int(os.getenv("AUDIO_QUEUE_MAX_SIZE", "8"))
-READ_TIMEOUT_SECONDS = float(os.getenv("AUDIO_READ_TIMEOUT_SECONDS", "5"))
-RECV_TIMEOUT_SECONDS = float(os.getenv("TRANSCRIPTION_RECV_TIMEOUT_SECONDS", "30"))
-MAX_RECONNECT_ATTEMPTS = int(os.getenv("MAX_RECONNECT_ATTEMPTS", "5"))
-INITIAL_RECONNECT_DELAY = float(os.getenv("INITIAL_RECONNECT_DELAY", "2"))
-MAX_RECONNECT_DELAY = float(os.getenv("MAX_RECONNECT_DELAY", "30"))
+logger = logging.getLogger(__name__)
 
-PARTIAL_LINE_LIMIT = 120
-PARTIAL_PRINT_STEP = 180
-PARTIAL_SEND_STEP = int(os.getenv("PARTIAL_SEND_STEP", "3"))
-PARTIAL_SEND_INTERVAL_MS = int(os.getenv("PARTIAL_SEND_INTERVAL_MS", "120"))
 
-# SPEECH_MODEL = "universal-streaming-multilingual"
-SPEECH_MODEL = os.getenv("SPEECH_MODEL", "u3-rt-pro")
-TRANSCRIPTION_PROMPT = os.getenv(
+@dataclass(frozen=True)
+class Settings:
+    sample_rate: int = int(os.getenv("AUDIO_SAMPLE_RATE", "16000"))
+    channels: int = int(os.getenv("AUDIO_CHANNELS", "1"))
+    chunk_size: int = int(os.getenv("AUDIO_CHUNK_SIZE", "3200"))
+    audio_queue_size: int = int(os.getenv("AUDIO_QUEUE_MAX_SIZE", "8"))
+    read_timeout: float = float(os.getenv("AUDIO_READ_TIMEOUT_SECONDS", "5"))
+    recv_timeout: float = float(os.getenv("TRANSCRIPTION_RECV_TIMEOUT_SECONDS", "30"))
+    max_reconnects: int = int(os.getenv("MAX_RECONNECT_ATTEMPTS", "5"))
+    reconnect_delay: float = float(os.getenv("INITIAL_RECONNECT_DELAY", "2"))
+    max_reconnect_delay: float = float(os.getenv("MAX_RECONNECT_DELAY", "30"))
+    speech_model: str = os.getenv("SPEECH_MODEL", "u3-rt-pro")
+    audio_device: str = os.getenv("AUDIO_DEVICE", "").strip()
+    list_audio_devices: bool = os.getenv("LIST_AUDIO_DEVICES", "0") == "1"
+    debug_latency: bool = os.getenv("DEBUG_LATENCY", "0") == "1"
+    use_portuguese_prompt: bool = os.getenv("USE_PORTUGUESE_PROMPT", "1") == "1"
+    latency_log_interval: float = float(os.getenv("LATENCY_LOG_INTERVAL_SECONDS", "2"))
+    partial_send_step: int = int(os.getenv("PARTIAL_SEND_STEP", "3"))
+    partial_send_interval_ms: int = int(os.getenv("PARTIAL_SEND_INTERVAL_MS", "120"))
+
+    @property
+    def block_samples(self) -> int:
+        return max(1, self.chunk_size // (self.channels * 2))
+
+
+SETTINGS = Settings()
+
+PORTUGUESE_PROMPT = os.getenv(
     "TRANSCRIPTION_PROMPT",
     (
         "Transcreva exclusivamente em português do Brasil. "
@@ -39,75 +51,11 @@ TRANSCRIPTION_PROMPT = os.getenv(
         "Use pontuação simples. Não traduza para inglês."
     ),
 )
+
 KEYTERMS_PROMPT = os.getenv(
     "KEYTERMS_PROMPT",
     "português do Brasil,aula,professor,aluno,Libras,inclusão,acessibilidade",
 )
-LANGUAGE_DETECTION = os.getenv("LANGUAGE_DETECTION", "true")
-USE_PORTUGUESE_PROMPT = os.getenv("USE_PORTUGUESE_PROMPT", "1") == "1"
-
-
-def montar_url(use_portuguese_prompt: bool = True) -> str:
-    parametros: dict[str, Any] = {
-        "sample_rate": SAMPLE_RATE,
-        "speech_model": SPEECH_MODEL,
-        "encoding": "pcm_s16le",
-        "include_partial_turns": "true",
-    }
-
-    if use_portuguese_prompt:
-        parametros["language_detection"] = LANGUAGE_DETECTION
-        parametros["prompt"] = TRANSCRIPTION_PROMPT
-
-        termos = [
-            termo.strip()
-            for termo in KEYTERMS_PROMPT.split(",")
-            if termo.strip()
-        ]
-        if termos:
-            parametros["keyterms_prompt"] = termos
-
-    return "wss://streaming.assemblyai.com/v3/ws?" + urlencode(
-        parametros,
-        doseq=True,
-    )
-
-
-logging.basicConfig(
-    level=logging.ERROR,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-
-logger = logging.getLogger(__name__)
-DEBUG_LATENCY = os.getenv("DEBUG_LATENCY", "0") == "1"
-LIST_AUDIO_DEVICES = os.getenv("LIST_AUDIO_DEVICES", "0") == "1"
-LATENCY_LOG_INTERVAL_SECONDS = float(os.getenv("LATENCY_LOG_INTERVAL_SECONDS", "2"))
-
-
-class AudioStats:
-    def __init__(self) -> None:
-        self.descartados = 0
-        self.enfileirados = 0
-        self.enviados = 0
-        self.maior_idade_fila_ms = 0.0
-
-    def registrar_descarte(self) -> None:
-        self.descartados += 1
-
-    def registrar_entrada(self) -> None:
-        self.enfileirados += 1
-
-    def registrar_envio(self, idade_fila_ms: float) -> None:
-        self.enviados += 1
-        self.maior_idade_fila_ms = max(self.maior_idade_fila_ms, idade_fila_ms)
-
-    def resumo(self) -> str:
-        return (
-            f"audio_chunks={self.enfileirados} "
-            f"enviados={self.enviados} "
-            f"descartados={self.descartados} "
-            f"maior_fila={self.maior_idade_fila_ms:.0f}ms"
-        )
 
 
 class RecoverableTranscriptionError(Exception):
@@ -118,402 +66,390 @@ class FatalTranscriptionError(Exception):
     pass
 
 
-def validar_configuracao() -> None:
-    if SAMPLE_RATE <= 0:
-        raise FatalTranscriptionError("AUDIO_SAMPLE_RATE deve ser maior que zero.")
-    if CHANNELS != 1:
-        raise FatalTranscriptionError("AUDIO_CHANNELS deve ser 1 para audio_format=pcm16.")
-    if CHUNK_SIZE <= 0:
-        raise FatalTranscriptionError("AUDIO_CHUNK_SIZE deve ser maior que zero.")
-    if CHUNK_SIZE % (CHANNELS * SAMPLE_WIDTH_BYTES) != 0:
-        raise FatalTranscriptionError(
-            "AUDIO_CHUNK_SIZE deve ser multiplo do tamanho de uma amostra."
+@dataclass
+class AudioStats:
+    queued: int = 0
+    sent: int = 0
+    dropped: int = 0
+    max_queue_age_ms: float = 0.0
+
+    def summary(self) -> str:
+        return (
+            f"audio_chunks={self.queued} "
+            f"enviados={self.sent} "
+            f"descartados={self.dropped} "
+            f"maior_fila={self.max_queue_age_ms:.0f}ms"
         )
-    if AUDIO_QUEUE_MAX_SIZE < 1:
+
+
+class TerminalTranscript:
+    line_limit = 120
+    print_step = 180
+
+    def __init__(
+        self,
+        on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
+    ) -> None:
+        self.on_text = on_text
+        self.partial_text = ""
+        self.partial_printed = 0
+        self.partial_sent = ""
+        self.partial_sent_at = 0.0
+        self.previous_line_size = 0
+
+    async def handle_turn(self, text: str, final: bool) -> None:
+        if final:
+            await self._final(text)
+            return
+
+        if text != self.partial_text:
+            await self._partial(text)
+
+    async def _final(self, text: str) -> None:
+        clear_line(max(150, self.previous_line_size))
+        print("-" * 60)
+        print(text)
+        print("-" * 60)
+        print()
+        await notify(
+            self.on_text,
+            {"type": "transcript", "text": text, "is_final": True},
+        )
+        self._reset()
+
+    async def _partial(self, text: str) -> None:
+        self.partial_text = text
+        now = time.monotonic()
+
+        if self._should_send_partial(text, now):
+            await notify(
+                self.on_text,
+                {"type": "transcript", "text": text, "is_final": False},
+            )
+            self.partial_sent = text
+            self.partial_sent_at = now
+
+        if len(text) - self.partial_printed >= self.print_step:
+            clear_line(max(150, self.previous_line_size))
+            print("Ouvindo:")
+            print(text[self.partial_printed :])
+            print()
+            self.partial_printed = len(text)
+            self.previous_line_size = 0
+        else:
+            display = text[-self.line_limit :]
+            line = "Ouvindo: " + display
+            padding = max(0, self.previous_line_size - len(line))
+            sys.stdout.write("\r" + line + " " * (padding + 20))
+            self.previous_line_size = len(line)
+
+        sys.stdout.flush()
+
+    def _should_send_partial(self, text: str, now: float) -> bool:
+        elapsed_ms = (now - self.partial_sent_at) * 1000
+        return (
+            not self.partial_sent
+            or len(text) - len(self.partial_sent) >= SETTINGS.partial_send_step
+            or (
+                text != self.partial_sent
+                and elapsed_ms >= SETTINGS.partial_send_interval_ms
+            )
+        )
+
+    def _reset(self) -> None:
+        self.partial_text = ""
+        self.partial_printed = 0
+        self.partial_sent = ""
+        self.partial_sent_at = 0.0
+        self.previous_line_size = 0
+
+
+def validate_settings() -> None:
+    if SETTINGS.sample_rate <= 0:
+        raise FatalTranscriptionError("AUDIO_SAMPLE_RATE deve ser maior que zero.")
+    if SETTINGS.channels != 1:
+        raise FatalTranscriptionError("AUDIO_CHANNELS deve ser 1 para pcm16.")
+    if SETTINGS.chunk_size <= 0:
+        raise FatalTranscriptionError("AUDIO_CHUNK_SIZE deve ser maior que zero.")
+    if SETTINGS.chunk_size % 2 != 0:
+        raise FatalTranscriptionError("AUDIO_CHUNK_SIZE deve ser par para pcm16.")
+    if SETTINGS.audio_queue_size < 1:
         raise FatalTranscriptionError("AUDIO_QUEUE_MAX_SIZE deve ser no minimo 1.")
-    if READ_TIMEOUT_SECONDS <= 0 or RECV_TIMEOUT_SECONDS <= 0:
-        raise FatalTranscriptionError("Timeouts devem ser maiores que zero.")
-    if MAX_RECONNECT_ATTEMPTS < 0:
-        raise FatalTranscriptionError("MAX_RECONNECT_ATTEMPTS nao pode ser negativo.")
 
 
-def obter_auth_key() -> str:
+def get_auth_key() -> str:
     auth_key = getattr(Configure, "AuthKey", "")
     if not auth_key:
         raise FatalTranscriptionError("ASSEMBLYAI_API_KEY não configurada.")
     return auth_key
 
 
-def limpar_linha(tamanho_minimo: int = 150) -> None:
-    sys.stdout.write("\r" + " " * tamanho_minimo + "\r")
+def build_url(use_portuguese_prompt: bool) -> str:
+    params: dict[str, Any] = {
+        "sample_rate": SETTINGS.sample_rate,
+        "speech_model": SETTINGS.speech_model,
+        "encoding": "pcm_s16le",
+        "include_partial_turns": "true",
+    }
+
+    if use_portuguese_prompt:
+        params["prompt"] = PORTUGUESE_PROMPT
+        keyterms = [term.strip() for term in KEYTERMS_PROMPT.split(",") if term.strip()]
+        if keyterms:
+            params["keyterms_prompt"] = json.dumps(keyterms, ensure_ascii=False)
+
+    return "wss://streaming.assemblyai.com/v3/ws?" + urlencode(params, doseq=True)
 
 
-def nome_dispositivo(dispositivo: dict[str, Any]) -> str:
-    hostapi = sd.query_hostapis(dispositivo["hostapi"])
-    return f"{dispositivo['name']} ({hostapi['name']})"
+def clear_line(min_size: int = 150) -> None:
+    sys.stdout.write("\r" + " " * min_size + "\r")
 
 
-def selecionar_microfone() -> int | None:
-    escolha = os.getenv("AUDIO_DEVICE", "").strip()
-    dispositivos = sd.query_devices()
-
-    if escolha:
-        if escolha.isdigit():
-            indice = int(escolha)
-            if 0 <= indice < len(dispositivos):
-                dispositivo = dispositivos[indice]
-                if dispositivo.get("max_input_channels", 0) > 0:
-                    return indice
-            return None
-
-        escolha_normalizada = escolha.lower()
-        for indice, dispositivo in enumerate(dispositivos):
-            if dispositivo.get("max_input_channels", 0) <= 0:
-                continue
-            if escolha_normalizada in nome_dispositivo(dispositivo).lower():
-                return indice
-
-        return None
-
-    dispositivo_padrao = sd.default.device
-    indice_padrao = dispositivo_padrao[0]
-    if indice_padrao is not None and indice_padrao >= 0:
-        dispositivo = dispositivos[indice_padrao]
-        if dispositivo.get("max_input_channels", 0) > 0:
-            return indice_padrao
-
-    for indice, dispositivo in enumerate(dispositivos):
-        if dispositivo.get("max_input_channels", 0) > 0:
-            return indice
-
-    return None
+def device_name(device: dict[str, Any]) -> str:
+    hostapi = sd.query_hostapis(device["hostapi"])
+    return f"{device['name']} ({hostapi['name']})"
 
 
-def listar_microfones() -> list[str]:
-    linhas = []
-    for indice, dispositivo in enumerate(sd.query_devices()):
-        if dispositivo.get("max_input_channels", 0) > 0:
-            linhas.append(f"{indice}: {nome_dispositivo(dispositivo)}")
-    return linhas
+def input_devices() -> list[tuple[int, dict[str, Any]]]:
+    return [
+        (index, device)
+        for index, device in enumerate(sd.query_devices())
+        if device.get("max_input_channels", 0) > 0
+    ]
 
 
-def imprimir_microfones() -> None:
-    microfones = listar_microfones()
-
-    if not microfones:
+def print_audio_devices() -> None:
+    devices = input_devices()
+    if not devices:
         print("Nenhum microfone listado.")
         return
 
     print("Microfones disponíveis:")
-    for microfone in microfones:
-        print(microfone)
+    for index, device in devices:
+        print(f"{index}: {device_name(device)}")
 
 
-def erro_api_fatal(mensagem: str) -> bool:
-    mensagem = mensagem.lower()
-    termos_fatais = (
-        "401",
-        "403",
-        "unauthorized",
-        "forbidden",
-        "api key",
-        "authentication",
-        "authorization",
-        "quota",
-        "billing",
-        "invalid api",
-        "invalid token",
-        "invalid model",
+def select_microphone() -> int | None:
+    devices = input_devices()
+    if not devices:
+        return None
+
+    choice = SETTINGS.audio_device
+    if choice.isdigit():
+        selected = int(choice)
+        return selected if any(index == selected for index, _ in devices) else None
+
+    if choice:
+        choice = choice.lower()
+        for index, device in devices:
+            if choice in device_name(device).lower():
+                return index
+        return None
+
+    default_input = sd.default.device[0]
+    if default_input is not None and any(index == default_input for index, _ in devices):
+        return default_input
+
+    return devices[0][0]
+
+
+def api_error_is_fatal(message: str) -> bool:
+    message = message.lower()
+    return any(
+        term in message
+        for term in (
+            "401",
+            "403",
+            "unauthorized",
+            "forbidden",
+            "api key",
+            "authentication",
+            "authorization",
+            "quota",
+            "billing",
+            "invalid api",
+            "invalid token",
+            "invalid model",
+        )
     )
-    return any(termo in mensagem for termo in termos_fatais)
 
 
-def erro_parametro_streaming(mensagem: str) -> bool:
-    mensagem = mensagem.lower()
-    termos_parametro = (
-        "prompt",
-        "keyterms",
-        "language_detection",
-        "include_partial",
-        "query",
-        "parameter",
-        "param",
-        "unsupported",
-        "unknown",
-        "invalid",
+def api_error_is_prompt_related(message: str) -> bool:
+    message = message.lower()
+    return any(
+        term in message
+        for term in (
+            "prompt",
+            "keyterms",
+            "language_detection",
+            "include_partial",
+            "query",
+            "parameter",
+            "unsupported",
+            "unknown",
+            "invalid",
+        )
     )
-    return any(termo in mensagem for termo in termos_parametro)
 
 
-async def notificar(
+async def notify(
     on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
-    mensagem: dict[str, Any],
+    message: dict[str, Any],
 ) -> None:
     if on_text:
-        await on_text(mensagem)
+        await on_text(message)
 
 
-def criar_fila_audio(
+def make_audio_queue(
     loop: asyncio.AbstractEventLoop,
-) -> tuple[asyncio.Queue[tuple[bytes, float]], Callable[[Any, int, Any, Any], None], AudioStats]:
-    fila: asyncio.Queue[tuple[bytes, float]] = asyncio.Queue(
-        maxsize=AUDIO_QUEUE_MAX_SIZE
+) -> tuple[
+    asyncio.Queue[tuple[bytes, float]],
+    Callable[[Any, int, Any, Any], None],
+    AudioStats,
+]:
+    queue: asyncio.Queue[tuple[bytes, float]] = asyncio.Queue(
+        maxsize=SETTINGS.audio_queue_size
     )
     stats = AudioStats()
 
-    def inserir_audio(dados: bytes, capturado_em: float) -> None:
-        if fila.full():
+    def push_audio(data: bytes, captured_at: float) -> None:
+        if queue.full():
             try:
-                fila.get_nowait()
-                stats.registrar_descarte()
+                queue.get_nowait()
+                stats.dropped += 1
             except asyncio.QueueEmpty:
                 pass
+
         try:
-            fila.put_nowait((dados, capturado_em))
-            stats.registrar_entrada()
+            queue.put_nowait((data, captured_at))
+            stats.queued += 1
         except asyncio.QueueFull:
-            stats.registrar_descarte()
-            pass
+            stats.dropped += 1
 
     def callback(indata, frames, time_info, status) -> None:
         if status:
             logger.warning("Aviso na captura de áudio: %s", status)
-        loop.call_soon_threadsafe(inserir_audio, bytes(indata), time.monotonic())
+        loop.call_soon_threadsafe(push_audio, bytes(indata), time.monotonic())
 
-    return fila, callback, stats
+    return queue, callback, stats
 
 
-async def ler_chunk_audio(fila_audio: asyncio.Queue[tuple[bytes, float]]) -> tuple[bytes, float]:
+async def read_audio(queue: asyncio.Queue[tuple[bytes, float]]) -> tuple[bytes, float]:
     try:
-        return await asyncio.wait_for(
-            fila_audio.get(),
-            timeout=READ_TIMEOUT_SECONDS,
-        )
+        return await asyncio.wait_for(queue.get(), timeout=SETTINGS.read_timeout)
     except TimeoutError as exc:
         raise RecoverableTranscriptionError("Captura de áudio sem dados.") from exc
 
 
-async def enviar_audio(
+async def send_audio(
     ws: Any,
-    fila_audio: asyncio.Queue[tuple[bytes, float]],
+    audio_queue: asyncio.Queue[tuple[bytes, float]],
     stats: AudioStats,
 ) -> None:
     buffer = bytearray()
-    buffer_capturado_em = 0.0
-    ultimo_log = time.monotonic()
+    buffer_started_at = 0.0
+    last_log = time.monotonic()
 
     while True:
-        dados, capturado_em = await ler_chunk_audio(fila_audio)
+        data, captured_at = await read_audio(audio_queue)
         if not buffer:
-            buffer_capturado_em = capturado_em
-        buffer.extend(dados)
+            buffer_started_at = captured_at
+        buffer.extend(data)
 
-        while len(buffer) >= CHUNK_SIZE:
-            idade_fila_ms = (time.monotonic() - buffer_capturado_em) * 1000
-            await ws.send(bytes(buffer[:CHUNK_SIZE]))
-            stats.registrar_envio(idade_fila_ms)
-            del buffer[:CHUNK_SIZE]
+        while len(buffer) >= SETTINGS.chunk_size:
+            queue_age_ms = (time.monotonic() - buffer_started_at) * 1000
+            await ws.send(bytes(buffer[: SETTINGS.chunk_size]))
+            del buffer[: SETTINGS.chunk_size]
+
+            stats.sent += 1
+            stats.max_queue_age_ms = max(stats.max_queue_age_ms, queue_age_ms)
+
+            now = time.monotonic()
+            if SETTINGS.debug_latency and now - last_log >= SETTINGS.latency_log_interval:
+                print(f"\nlatencia_audio: {stats.summary()}\n")
+                last_log = now
 
             if not buffer:
-                buffer_capturado_em = 0.0
-
-            agora = time.monotonic()
-            if DEBUG_LATENCY and agora - ultimo_log >= LATENCY_LOG_INTERVAL_SECONDS:
-                print(f"\nlatencia_audio: {stats.resumo()}\n")
-                ultimo_log = agora
+                buffer_started_at = 0.0
 
 
-def deve_enviar_parcial(texto: str, parcial_enviado: str, enviado_em: float) -> bool:
-    agora = time.monotonic()
-    return (
-        not parcial_enviado
-        or len(texto) - len(parcial_enviado) >= PARTIAL_SEND_STEP
-        or (
-            texto != parcial_enviado
-            and (agora - enviado_em) * 1000 >= PARTIAL_SEND_INTERVAL_MS
-        )
-    )
-
-
-async def tratar_texto_final(
-    texto: str,
-    tamanho_linha_anterior: int,
-    on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
-) -> None:
-    limpar_linha(max(150, tamanho_linha_anterior))
-
-    print("-" * 60)
-    print(texto)
-    print("-" * 60)
-    print()
-
-    await notificar(
-        on_text,
-        {
-            "type": "transcript",
-            "text": texto,
-            "is_final": True,
-        },
-    )
-
-
-async def tratar_texto_parcial(
-    texto: str,
-    parcial_impresso: int,
-    parcial_enviado: str,
-    parcial_enviado_em: float,
-    tamanho_linha_anterior: int,
-    on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
-) -> tuple[int, str, float, int]:
-    agora = time.monotonic()
-
-    if deve_enviar_parcial(texto, parcial_enviado, parcial_enviado_em):
-        await notificar(
-            on_text,
-            {
-                "type": "transcript",
-                "text": texto,
-                "is_final": False,
-            },
-        )
-        parcial_enviado = texto
-        parcial_enviado_em = agora
-
-    if len(texto) - parcial_impresso >= PARTIAL_PRINT_STEP:
-        limpar_linha(max(150, tamanho_linha_anterior))
-
-        print("Ouvindo:")
-        print(texto[parcial_impresso:])
-        print()
-
-        parcial_impresso = len(texto)
-        tamanho_linha_anterior = 0
-    else:
-        exibicao = texto[-PARTIAL_LINE_LIMIT:]
-        linha = "Ouvindo: " + exibicao
-        limpar = max(0, tamanho_linha_anterior - len(linha))
-
-        sys.stdout.write("\r" + linha + " " * (limpar + 20))
-        tamanho_linha_anterior = len(linha)
-
-    sys.stdout.flush()
-    return parcial_impresso, parcial_enviado, parcial_enviado_em, tamanho_linha_anterior
-
-
-async def receber_texto(
+async def receive_transcripts(
     ws: Any,
     on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
 ) -> None:
-    texto_parcial = ""
-    parcial_impresso = 0
-    parcial_enviado = ""
-    parcial_enviado_em = 0.0
-    tamanho_linha_anterior = 0
+    terminal = TerminalTranscript(on_text)
 
     while True:
-        try:
-            async with asyncio.timeout(RECV_TIMEOUT_SECONDS):
-                resposta = await ws.recv()
-        except TimeoutError as exc:
-            raise RecoverableTranscriptionError("API sem resposta.") from exc
+        message = await receive_json(ws)
+        message_type = message.get("type")
 
-        dados = json.loads(resposta)
-        tipo = dados.get("type")
-
-        if tipo == "Turn":
-            texto = dados.get("transcript", "").strip()
-
-            if not texto:
-                continue
-
-            if dados.get("turn_is_done", False):
-                await tratar_texto_final(texto, tamanho_linha_anterior, on_text)
-                texto_parcial = ""
-                parcial_impresso = 0
-                parcial_enviado = ""
-                parcial_enviado_em = 0.0
-                tamanho_linha_anterior = 0
-                continue
-
-            if texto == texto_parcial:
-                continue
-
-            texto_parcial = texto
-            (
-                parcial_impresso,
-                parcial_enviado,
-                parcial_enviado_em,
-                tamanho_linha_anterior,
-            ) = await tratar_texto_parcial(
-                texto,
-                parcial_impresso,
-                parcial_enviado,
-                parcial_enviado_em,
-                tamanho_linha_anterior,
-                on_text,
-            )
-
-        elif tipo == "Error":
-            erro = dados.get("error", "Erro desconhecido")
-            if erro_api_fatal(erro):
-                raise FatalTranscriptionError(f"Erro fatal da API: {erro}")
-            raise RecoverableTranscriptionError(f"Erro da API: {erro}")
-
-        elif tipo == "SessionBegins":
-            print("Sessão iniciada.\n")
-
-        elif tipo == "SessionTerminated":
-            raise RecoverableTranscriptionError("Sessão encerrada pela API.")
-
-
-async def aguardar_inicio_sessao(ws: Any) -> None:
-    while True:
-        try:
-            async with asyncio.timeout(RECV_TIMEOUT_SECONDS):
-                resposta_bruta = await ws.recv()
-        except TimeoutError as exc:
-            raise RecoverableTranscriptionError("API sem resposta ao iniciar sessão.") from exc
-
-        try:
-            resposta = json.loads(resposta_bruta)
-        except json.JSONDecodeError as exc:
-            raise RecoverableTranscriptionError(
-                f"Resposta inválida ao iniciar sessão: {resposta_bruta!r}"
-            ) from exc
-
-        tipo = resposta.get("type")
-
-        if resposta.get("id") and tipo in (None, "Begin", "SessionBegins"):
-            return
-
-        if tipo in ("Begin", "SessionBegins") and resposta.get("id"):
-            return
-
-        if tipo in ("Error", "error"):
-            erro = resposta.get("error") or resposta.get("message") or resposta
-            mensagem = f"Erro da API ao iniciar sessão: {erro}"
-            if erro_api_fatal(str(erro)):
-                raise FatalTranscriptionError(mensagem)
-            raise RecoverableTranscriptionError(mensagem)
-
-        if tipo in ("Warning", "warning"):
-            aviso = resposta.get("warning") or resposta.get("message") or resposta
-            logger.warning("Aviso da API ao iniciar sessão: %s", aviso)
+        if message_type == "Turn":
+            text = message.get("transcript", "").strip()
+            if text:
+                await terminal.handle_turn(text, bool(message.get("turn_is_done")))
             continue
 
+        if message_type in ("SessionBegins", "Begin"):
+            print("Sessão iniciada.\n")
+            continue
+
+        if message_type == "SessionTerminated":
+            raise RecoverableTranscriptionError("Sessão encerrada pela API.")
+
+        if message_type in ("Error", "error"):
+            raise_api_error(message)
+
+
+async def receive_json(ws: Any) -> dict[str, Any]:
+    try:
+        async with asyncio.timeout(SETTINGS.recv_timeout):
+            raw = await ws.recv()
+    except TimeoutError as exc:
+        raise RecoverableTranscriptionError("API sem resposta.") from exc
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RecoverableTranscriptionError(f"Resposta inválida da API: {raw!r}") from exc
+
+
+def raise_api_error(message: dict[str, Any]) -> None:
+    error = message.get("error") or message.get("message") or message
+    text = str(error)
+    if api_error_is_fatal(text):
+        raise FatalTranscriptionError(f"Erro fatal da API: {text}")
+    raise RecoverableTranscriptionError(f"Erro da API: {text}")
+
+
+async def wait_session_start(ws: Any) -> None:
+    while True:
+        message = await receive_json(ws)
+        message_type = message.get("type")
+
+        if message.get("id") and message_type in (None, "Begin", "SessionBegins"):
+            return
+
+        if message_type in ("Warning", "warning"):
+            warning = message.get("warning") or message.get("message") or message
+            logger.warning("Aviso da API ao iniciar sessão: %s", warning)
+            continue
+
+        if message_type in ("Error", "error"):
+            raise_api_error(message)
+
         raise RecoverableTranscriptionError(
-            f"Resposta inesperada ao iniciar sessão: {resposta}"
+            f"Resposta inesperada ao iniciar sessão: {message}"
         )
 
 
-async def executar_sessao(
-    microfone: int,
+async def run_session(
+    microphone: int,
     auth_key: str,
     on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
     url: str,
 ) -> None:
     loop = asyncio.get_running_loop()
-    fila_audio, callback_audio, stats = criar_fila_audio(loop)
+    audio_queue, audio_callback, stats = make_audio_queue(loop)
 
     async with websockets.connect(
         url,
@@ -523,39 +459,28 @@ async def executar_sessao(
         close_timeout=10,
         max_size=None,
     ) as ws:
-        await aguardar_inicio_sessao(ws)
-
+        await wait_session_start(ws)
         print("=" * 60)
         print("TRANSCRIÇÃO EM TEMPO REAL")
         print("=" * 60)
         print()
 
-        try:
-            sd.check_input_settings(
-                device=microfone,
-                channels=CHANNELS,
-                samplerate=SAMPLE_RATE,
-                dtype="int16",
-            )
-        except Exception as exc:
-            raise FatalTranscriptionError(
-                f"Microfone incompatível com {SAMPLE_RATE}Hz mono int16: {exc}"
-            ) from exc
+        check_microphone(microphone)
 
         with sd.RawInputStream(
-            samplerate=SAMPLE_RATE,
-            blocksize=BLOCK_SAMPLES,
-            device=microfone,
-            channels=CHANNELS,
+            samplerate=SETTINGS.sample_rate,
+            blocksize=SETTINGS.block_samples,
+            device=microphone,
+            channels=SETTINGS.channels,
             dtype="int16",
-            callback=callback_audio,
+            callback=audio_callback,
         ):
-            tarefas = [
-                asyncio.create_task(enviar_audio(ws, fila_audio, stats)),
-                asyncio.create_task(receber_texto(ws, on_text)),
+            tasks = [
+                asyncio.create_task(send_audio(ws, audio_queue, stats)),
+                asyncio.create_task(receive_transcripts(ws, on_text)),
             ]
             done, pending = await asyncio.wait(
-                tarefas,
+                tasks,
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -572,132 +497,122 @@ async def executar_sessao(
                     pass
 
 
+def check_microphone(microphone: int) -> None:
+    try:
+        sd.check_input_settings(
+            device=microphone,
+            channels=SETTINGS.channels,
+            samplerate=SETTINGS.sample_rate,
+            dtype="int16",
+        )
+    except Exception as exc:
+        raise FatalTranscriptionError(
+            f"Microfone incompatível com {SETTINGS.sample_rate}Hz mono int16: {exc}"
+        ) from exc
+
+
 async def iniciar_transcricao(
     on_text: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
-):
+) -> None:
     try:
-        validar_configuracao()
-        if LIST_AUDIO_DEVICES:
-            imprimir_microfones()
+        validate_settings()
+        if SETTINGS.list_audio_devices:
+            print_audio_devices()
             return
-
-        auth_key = obter_auth_key()
+        auth_key = get_auth_key()
     except FatalTranscriptionError as exc:
-        print(f"\n{exc}\n")
-        await notificar(
+        await fail(on_text, str(exc))
+        return
+
+    microphone = select_microphone()
+    if microphone is None:
+        devices = "\n".join(f"{i}: {device_name(d)}" for i, d in input_devices())
+        await fail(
             on_text,
-            {
-                "type": "error",
-                "text": str(exc),
-                "is_final": True,
-                "error": True,
-            },
+            "Microfone não encontrado.\n" + (devices or "Nenhum microfone listado."),
         )
         return
 
-    microfone = selecionar_microfone()
-
-    if microfone is None:
-        microfones = "\n".join(listar_microfones()) or "Nenhum microfone listado."
-        mensagem = f"Microfone não encontrado.\n{microfones}"
-        print(f"\n{mensagem}\n")
-        await notificar(
-            on_text,
-            {
-                "type": "error",
-                "text": mensagem,
-                "is_final": True,
-                "error": True,
-            },
-        )
-        return
-
-    dispositivo = sd.query_devices(microfone)
+    device = sd.query_devices(microphone)
     print("\nMicrofone selecionado:")
-    print(f"{microfone}: {nome_dispositivo(dispositivo)}")
+    print(f"{microphone}: {device_name(device)}")
     print()
 
-    tentativa = 0
-    atraso = INITIAL_RECONNECT_DELAY
-    usar_prompt_portugues = USE_PORTUGUESE_PROMPT
+    await reconnecting_loop(microphone, auth_key, on_text)
+
+
+async def reconnecting_loop(
+    microphone: int,
+    auth_key: str,
+    on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
+) -> None:
+    attempts = 0
+    delay = SETTINGS.reconnect_delay
+    use_prompt = SETTINGS.use_portuguese_prompt
 
     while True:
         try:
-            url = montar_url(usar_prompt_portugues)
-            await executar_sessao(microfone, auth_key, on_text, url)
+            await run_session(microphone, auth_key, on_text, build_url(use_prompt))
             return
         except asyncio.CancelledError:
             raise
         except FatalTranscriptionError as exc:
-            mensagem = str(exc)
-            logger.error("Erro fatal na transcrição: %s", mensagem)
-            print(f"\n{mensagem}\n")
-            await notificar(
-                on_text,
-                {
-                    "type": "error",
-                    "text": mensagem,
-                    "is_final": True,
-                    "error": True,
-                },
-            )
+            await fail(on_text, str(exc))
             return
         except Exception as exc:
-            if usar_prompt_portugues and erro_parametro_streaming(str(exc)):
-                usar_prompt_portugues = False
-                tentativa = 0
-                atraso = INITIAL_RECONNECT_DELAY
-                print(
-                    "\nA API recusou algum parâmetro de prompt/idioma. "
-                    "Tentando novamente com configuração básica.\n"
-                )
+            if use_prompt and api_error_is_prompt_related(str(exc)):
+                use_prompt = False
+                attempts = 0
+                delay = SETTINGS.reconnect_delay
+                logger.warning("A API recusou parâmetros de prompt. Usando URL básica.")
                 continue
 
-            tentativa += 1
+            attempts += 1
             logger.error("Erro na transcrição: %s", exc)
 
-            if tentativa > MAX_RECONNECT_ATTEMPTS:
-                mensagem = (
-                    "Transcrição encerrada após "
-                    f"{MAX_RECONNECT_ATTEMPTS} tentativas de reconexão: {exc}"
-                )
-                print(f"\n{mensagem}\n")
-                await notificar(
+            if attempts > SETTINGS.max_reconnects:
+                await fail(
                     on_text,
-                    {
-                        "type": "error",
-                        "text": mensagem,
-                        "is_final": True,
-                        "error": True,
-                    },
+                    "Transcrição encerrada após "
+                    f"{SETTINGS.max_reconnects} tentativas de reconexão: {exc}",
                 )
                 return
 
             print(
                 "\nConexão perdida. "
-                f"Reconectando em {atraso:.0f}s "
-                f"({tentativa}/{MAX_RECONNECT_ATTEMPTS})...\n"
+                f"Reconectando em {delay:.0f}s "
+                f"({attempts}/{SETTINGS.max_reconnects})...\n"
             )
-            await asyncio.sleep(atraso)
-            atraso = min(atraso * 2, MAX_RECONNECT_DELAY)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, SETTINGS.max_reconnect_delay)
 
 
-async def main():
+async def fail(
+    on_text: Callable[[dict[str, Any]], Awaitable[None]] | None,
+    text: str,
+) -> None:
+    print(f"\n{text}\n")
+    await notify(
+        on_text,
+        {"type": "error", "text": text, "is_final": True, "error": True},
+    )
+
+
+async def main() -> None:
     try:
         await iniciar_transcricao()
-
-    except asyncio.CancelledError:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         print("\nPrograma encerrado.\n")
-
-    except KeyboardInterrupt:
-        print("\nPrograma encerrado.\n")
-
-    except Exception as e:
-        print(f"\nErro geral: {e}\n")
+    except Exception as exc:
+        print(f"\nErro geral: {exc}\n")
 
 
 if __name__ == "__main__":
     try:
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nPrograma encerrado.\n")
