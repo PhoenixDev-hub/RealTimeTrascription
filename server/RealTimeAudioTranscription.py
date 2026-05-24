@@ -36,10 +36,6 @@ class Settings:
     partial_send_step: int = int(os.getenv("PARTIAL_SEND_STEP", "3"))
     partial_send_interval_ms: int = int(os.getenv("PARTIAL_SEND_INTERVAL_MS", "120"))
 
-    @property
-    def block_samples(self) -> int:
-        return max(1, self.chunk_size // (self.channels * 2))
-
 
 SETTINGS = Settings()
 
@@ -80,6 +76,28 @@ class AudioStats:
             f"descartados={self.dropped} "
             f"maior_fila={self.max_queue_age_ms:.0f}ms"
         )
+
+
+class AudioBuffer:
+    def __init__(self, max_size: int) -> None:
+        self.queue: asyncio.Queue[tuple[bytes, float]] = asyncio.Queue(maxsize=max_size)
+        self.stats = AudioStats()
+
+    def push(self, data: bytes, captured_at: float) -> None:
+        while True:
+            try:
+                self.queue.put_nowait((data, captured_at))
+                self.stats.queued += 1
+                return
+            except asyncio.QueueFull:
+                self.drop_oldest()
+
+    def drop_oldest(self) -> None:
+        try:
+            self.queue.get_nowait()
+            self.stats.dropped += 1
+        except asyncio.QueueEmpty:
+            return
 
 
 class TerminalTranscript:
@@ -177,6 +195,10 @@ def validate_settings() -> None:
         raise FatalTranscriptionError("AUDIO_QUEUE_MAX_SIZE deve ser no minimo 1.")
 
 
+def block_samples() -> int:
+    return max(1, SETTINGS.chunk_size // (SETTINGS.channels * 2))
+
+
 def get_auth_key() -> str:
     auth_key = getattr(Configure, "AuthKey", "")
     if not auth_key:
@@ -247,7 +269,9 @@ def select_microphone() -> int | None:
         return None
 
     default_input = sd.default.device[0]
-    if default_input is not None and any(index == default_input for index, _ in devices):
+    if default_input is not None and any(
+        index == default_input for index, _ in devices
+    ):
         return default_input
 
     return devices[0][0]
@@ -303,35 +327,17 @@ async def notify(
 def make_audio_queue(
     loop: asyncio.AbstractEventLoop,
 ) -> tuple[
-    asyncio.Queue[tuple[bytes, float]],
+    AudioBuffer,
     Callable[[Any, int, Any, Any], None],
-    AudioStats,
 ]:
-    queue: asyncio.Queue[tuple[bytes, float]] = asyncio.Queue(
-        maxsize=SETTINGS.audio_queue_size
-    )
-    stats = AudioStats()
-
-    def push_audio(data: bytes, captured_at: float) -> None:
-        if queue.full():
-            try:
-                queue.get_nowait()
-                stats.dropped += 1
-            except asyncio.QueueEmpty:
-                pass
-
-        try:
-            queue.put_nowait((data, captured_at))
-            stats.queued += 1
-        except asyncio.QueueFull:
-            stats.dropped += 1
+    buffer = AudioBuffer(max_size=SETTINGS.audio_queue_size)
 
     def callback(indata, frames, time_info, status) -> None:
         if status:
             logger.warning("Aviso na captura de áudio: %s", status)
-        loop.call_soon_threadsafe(push_audio, bytes(indata), time.monotonic())
+        loop.call_soon_threadsafe(buffer.push, bytes(indata), time.monotonic())
 
-    return queue, callback, stats
+    return buffer, callback
 
 
 async def read_audio(queue: asyncio.Queue[tuple[bytes, float]]) -> tuple[bytes, float]:
@@ -365,7 +371,10 @@ async def send_audio(
             stats.max_queue_age_ms = max(stats.max_queue_age_ms, queue_age_ms)
 
             now = time.monotonic()
-            if SETTINGS.debug_latency and now - last_log >= SETTINGS.latency_log_interval:
+            if (
+                SETTINGS.debug_latency
+                and now - last_log >= SETTINGS.latency_log_interval
+            ):
                 print(f"\nlatencia_audio: {stats.summary()}\n")
                 last_log = now
 
@@ -410,7 +419,9 @@ async def receive_json(ws: Any) -> dict[str, Any]:
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise RecoverableTranscriptionError(f"Resposta inválida da API: {raw!r}") from exc
+        raise RecoverableTranscriptionError(
+            f"Resposta inválida da API: {raw!r}"
+        ) from exc
 
 
 def raise_api_error(message: dict[str, Any]) -> None:
@@ -422,11 +433,17 @@ def raise_api_error(message: dict[str, Any]) -> None:
 
 
 async def wait_session_start(ws: Any) -> None:
+    start_types = {"Begin", "SessionBegins"}
+
     while True:
         message = await receive_json(ws)
         message_type = message.get("type")
 
-        if message.get("id") and message_type in (None, "Begin", "SessionBegins"):
+        if message_type in start_types and message.get("id"):
+            return
+
+        if message_type is None and message.get("id"):
+            logger.info("Sessão iniciada com resposta sem campo type: %s", message)
             return
 
         if message_type in ("Warning", "warning"):
@@ -449,7 +466,7 @@ async def run_session(
     url: str,
 ) -> None:
     loop = asyncio.get_running_loop()
-    audio_queue, audio_callback, stats = make_audio_queue(loop)
+    audio_buffer, audio_callback = make_audio_queue(loop)
 
     async with websockets.connect(
         url,
@@ -469,14 +486,16 @@ async def run_session(
 
         with sd.RawInputStream(
             samplerate=SETTINGS.sample_rate,
-            blocksize=SETTINGS.block_samples,
+            blocksize=block_samples(),
             device=microphone,
             channels=SETTINGS.channels,
             dtype="int16",
             callback=audio_callback,
         ):
             tasks = [
-                asyncio.create_task(send_audio(ws, audio_queue, stats)),
+                asyncio.create_task(
+                    send_audio(ws, audio_buffer.queue, audio_buffer.stats)
+                ),
                 asyncio.create_task(receive_transcripts(ws, on_text)),
             ]
             done, pending = await asyncio.wait(
