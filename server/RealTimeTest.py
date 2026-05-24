@@ -1,9 +1,3 @@
-"""
-Transcrição em tempo real com estratégia de janela deslizante.
-Não espera o silêncio para transcrever — processa a cada 1s de fala
-e mostra resultado parcial enquanto a pessoa ainda fala.
-"""
-
 import numpy as np
 import os
 import queue
@@ -13,21 +7,19 @@ import time as time_mod
 from collections import deque
 from faster_whisper import WhisperModel
 
-# ─── Configurações ────────────────────────────────────────────────────────────
 
 SAMPLE_RATE = 16000
-CHUNK_SAMPLES = int(os.getenv("CHUNK_SAMPLES", "320"))  # 20ms
+CHUNK_SAMPLES = int(os.getenv("CHUNK_SAMPLES", "320"))
 CHUNK_SECONDS = CHUNK_SAMPLES / SAMPLE_RATE
 
-# VAD
+
 MIN_SPEECH_RMS = float(os.getenv("MIN_SPEECH_RMS", "2500"))
 NOISE_MULTIPLIER = float(os.getenv("NOISE_MULTIPLIER", "3.2"))
 START_SPEECH_CHUNKS = int(os.getenv("START_SPEECH_CHUNKS", "2"))
-SILENCE_CHUNKS = int(os.getenv("SILENCE_CHUNKS", "18"))  # ~360ms
+SILENCE_CHUNKS = int(os.getenv("SILENCE_CHUNKS", "18"))
 MIN_SPEECH_CHUNKS = int(os.getenv("MIN_SPEECH_CHUNKS", "12"))
 PRE_ROLL_CHUNKS = int(os.getenv("PRE_ROLL_CHUNKS", "6"))
 
-# Janela deslizante — transcreve a cada N segundos SEM esperar silêncio
 PARTIAL_EVERY_S = float(os.getenv("PARTIAL_EVERY_S", "1.2"))
 PARTIAL_CHUNKS = int(PARTIAL_EVERY_S / CHUNK_SECONDS)
 
@@ -37,7 +29,6 @@ MAX_SPEECH_CHUNKS = int(MAX_SPEECH_SECONDS / CHUNK_SECONDS)
 MIN_TRANSCRIBE_SECONDS = float(os.getenv("MIN_TRANSCRIBE_SECONDS", "0.35"))
 MIN_PEAK = int(os.getenv("MIN_PEAK", "1200"))
 
-# Whisper — tiny é o único viável para tempo real em CPU
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "tiny")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
@@ -45,7 +36,6 @@ WHISPER_CPU_THREADS = int(os.getenv("WHISPER_CPU_THREADS", str(os.cpu_count() or
 
 DEBUG_LATENCY = os.getenv("DEBUG_LATENCY", "0") == "1"
 
-# ─── Carrega modelo + warmup ──────────────────────────────────────────────────
 
 print(f"Carregando modelo Whisper ({WHISPER_MODEL})...")
 model = WhisperModel(
@@ -55,24 +45,20 @@ model = WhisperModel(
     cpu_threads=WHISPER_CPU_THREADS,
     num_workers=1,
 )
-# Warmup elimina spike de latência na primeira fala
 _w = np.zeros(SAMPLE_RATE, dtype=np.float32)
 list(model.transcribe(_w, language="pt")[0])
 print(f"Pronto! threads={WHISPER_CPU_THREADS} | partial a cada {PARTIAL_EVERY_S}s\n")
 
-# ─── Filas ────────────────────────────────────────────────────────────────────
 
 audio_queue = queue.Queue()
 transcription_queue = queue.Queue(maxsize=2)
 
-# ─── Callback ────────────────────────────────────────────────────────────────
 
 
 def callback(indata, frames, time_info, status):
     audio_queue.put(indata[:, 0].copy())
 
 
-# ─── Validação + enfileiramento ───────────────────────────────────────────────
 
 
 def enqueue(audio: np.ndarray, is_partial: bool = False) -> bool:
@@ -99,7 +85,6 @@ def enqueue(audio: np.ndarray, is_partial: bool = False) -> bool:
     return True
 
 
-# ─── Anti-alucinação ─────────────────────────────────────────────────────────
 
 _ALUCINACOES = {
     "obrigado",
@@ -142,9 +127,8 @@ def e_alucinacao(texto: str) -> bool:
     return False
 
 
-# ─── Transcrição ─────────────────────────────────────────────────────────────
 
-ultimo_texto = ""  # evita repetir resultado idêntico em parciais
+ultimo_texto = ""
 
 
 def transcrever(audio: np.ndarray, queued_at: float, is_partial: bool) -> None:
@@ -156,7 +140,7 @@ def transcrever(audio: np.ndarray, queued_at: float, is_partial: bool) -> None:
         audio_float,
         language="pt",
         task="transcribe",
-        beam_size=1,  # greedy — mais rápido
+        beam_size=1,
         best_of=1,
         temperature=0.0,
         repetition_penalty=1.2,
@@ -192,14 +176,12 @@ def transcrever(audio: np.ndarray, queued_at: float, is_partial: bool) -> None:
     if not texto or e_alucinacao(texto):
         return
 
-    # parcial: mostra só se mudou desde a última vez
     if is_partial:
         if texto != ultimo_texto:
             print(f"\r⏳ {texto}    ", end="", flush=True)
             ultimo_texto = texto
     else:
-        # resultado final — linha nova limpa
-        print(f"\r🤟 {texto}                    ")
+        print(f"\rTexto {texto}                    ")
         ultimo_texto = ""
 
     if DEBUG_LATENCY:
@@ -216,10 +198,6 @@ def loop_worker() -> None:
     while True:
         audio, queued_at, is_partial = transcription_queue.get()
         transcrever(audio, queued_at, is_partial)
-
-
-# ─── VAD + janela deslizante ──────────────────────────────────────────────────
-
 
 def loop_vad() -> None:
     buffer = []
@@ -254,13 +232,11 @@ def loop_vad() -> None:
                 buffer.append(chunk)
                 chunks_desde_parcial += 1
 
-                # ── transcrição parcial a cada PARTIAL_CHUNKS ──
                 if chunks_desde_parcial >= PARTIAL_CHUNKS:
                     audio_parcial = np.concatenate(buffer)
                     enqueue(audio_parcial, is_partial=True)
                     chunks_desde_parcial = 0
 
-            # corte por tamanho máximo
             if len(buffer) >= MAX_SPEECH_CHUNKS:
                 audio = np.concatenate(buffer)
                 enqueue(audio, is_partial=False)
@@ -277,7 +253,7 @@ def loop_vad() -> None:
                 chunks_desde_parcial = 0
                 if len(buffer) >= MIN_SPEECH_CHUNKS:
                     audio = np.concatenate(buffer)
-                    enqueue(audio, is_partial=False)  # resultado final
+                    enqueue(audio, is_partial=False)
                 buffer = []
                 silence_count = 0
 
@@ -287,7 +263,6 @@ def loop_vad() -> None:
             noise_floor = (noise_floor * 0.97) + (rms * 0.03)
 
 
-# ─── Inicia ───────────────────────────────────────────────────────────────────
 
 threading.Thread(target=loop_vad, daemon=True).start()
 threading.Thread(target=loop_worker, daemon=True).start()
