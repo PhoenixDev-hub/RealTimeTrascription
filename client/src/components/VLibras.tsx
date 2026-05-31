@@ -18,6 +18,13 @@ declare global {
     }
     plugin?: {
       translate?: (text: string) => void
+      player?: {
+        setSpeed?: (speed: number) => void
+      }
+      setSpeed?: (speed: number) => void
+    }
+    VLibrasPlayer?: {
+      setSpeed?: (speed: number) => void
     }
     __vlibrasWidgetStarted?: boolean
     __vlibrasWidgetBooted?: boolean
@@ -28,30 +35,154 @@ const SCRIPT_ID = 'vlibras-widget-script'
 const SCRIPT_SRC = 'https://vlibras.gov.br/app/vlibras-plugin.js'
 const TRANSLATE_DELAY_MS = 220
 const READY_RETRY_MS = 300
-const TRANSLATE_COMPLETE_MS = 900
 const MAX_TRANSLATE_ATTEMPTS = 24
 const CENTER_WIDGET_DELAY_MS = 250
+const MIN_TRANSLATION_MS = 1400
+const MAX_TRANSLATION_MS = 9000
+const MS_PER_CHARACTER = 38
+const DEFAULT_SPEED = 2
+const DEFAULT_SPEED_LABEL = 'x3'
+const SPEED_RETRY_MS = 350
+const SPEED_RETRY_COUNT = 12
+
+function setImportant(element: HTMLElement, property: string, value: string) {
+  element.style.setProperty(property, value, 'important')
+}
 
 export default function VLibras({ text }: VLibrasProps) {
   const initialized = useRef(false)
-  const lastTriggeredText = useRef('')
   const readyTimer = useRef<number | null>(null)
+  const speedTimer = useRef<number | null>(null)
+  const speedAttempts = useRef(0)
   const translating = useRef(false)
-  const pendingText = useRef<string | null>(null)
+  const queue = useRef<string[]>([])
+  const lastQueuedText = useRef('')
   const translateTimer = useRef<number | null>(null)
+  const translateNextRef = useRef<() => boolean>(() => true)
+
+  const estimateTranslationTime = useCallback((value: string) => {
+    const words = value.split(/\s+/).filter(Boolean).length
+    const textTime = value.length * MS_PER_CHARACTER
+    const wordTime = words * 240
+    return Math.min(MAX_TRANSLATION_MS, Math.max(MIN_TRANSLATION_MS, textTime + wordTime))
+  }, [])
 
   const centerWidget = useCallback(() => {
     const root = document.querySelector<HTMLElement>('[vw].enabled')
+    const accessButton = document.querySelector<HTMLElement>('[vw-access-button]')
     const wrapper = document.querySelector<HTMLElement>('[vw-plugin-wrapper]')
+    const widgetHeight = window.innerHeight <= 700 ? '358px' : '454px'
+    const widgetTop = window.innerHeight <= 700 ? '45%' : '50%'
 
     if (root) {
-      root.classList.add('vlibras-centered')
+      setImportant(root, 'position', 'fixed')
+      setImportant(root, 'top', widgetTop)
+      setImportant(root, 'right', 'auto')
+      setImportant(root, 'bottom', 'auto')
+      setImportant(root, 'left', '50%')
+      setImportant(root, 'width', '316px')
+      setImportant(root, 'height', widgetHeight)
+      setImportant(root, 'min-width', '316px')
+      setImportant(root, 'min-height', widgetHeight)
+      setImportant(root, 'max-width', '92vw')
+      setImportant(root, 'transform', 'translate(-50%, -50%)')
+      setImportant(root, 'margin-top', '0')
+      setImportant(root, 'z-index', '2147483646')
+      setImportant(root, 'pointer-events', 'auto')
+    }
+
+    if (accessButton) {
+      setImportant(accessButton, 'position', 'fixed')
+      setImportant(accessButton, 'right', '18px')
+      setImportant(accessButton, 'bottom', '18px')
+      setImportant(accessButton, 'z-index', '999999')
+      setImportant(accessButton, 'pointer-events', 'auto')
+      setImportant(accessButton, 'display', 'none')
     }
 
     if (wrapper) {
-      wrapper.classList.add('vlibras-center-wrapper')
+      setImportant(wrapper, 'width', '316px')
+      setImportant(wrapper, 'height', widgetHeight)
+      setImportant(wrapper, 'min-height', widgetHeight)
+      setImportant(wrapper, 'max-width', '100%')
+      setImportant(wrapper, 'z-index', '2147483646')
+      setImportant(wrapper, 'pointer-events', 'auto')
+    }
+
+    document
+      .querySelectorAll<HTMLElement>(
+        '.vpw-box, .vpw-controls, .vpw-subtitles, .vpw-playing, .vpw-message-box, .vp-rate-box-content, .vp-rate-box-header, .vp-enabled, .vp-button-change-avatar, .avatar-icaro, .vp-selected',
+      )
+      .forEach((element) => {
+        setImportant(element, 'display', 'none')
+      })
+
+    document
+      .querySelectorAll<HTMLElement>('.emscripten, #canvas, [vw-plugin-wrapper]')
+      .forEach((element) => {
+        setImportant(element, 'background-color', 'transparent')
+      })
+
+    const canvas = document.querySelector<HTMLElement>('#canvas')
+
+    if (canvas) {
+      setImportant(canvas, 'max-width', '100%')
     }
   }, [])
+
+  const applyDefaultSpeed = useCallback(() => {
+    let apiSpeedApplied: boolean
+
+    try {
+      window.VLibrasPlayer?.setSpeed?.(DEFAULT_SPEED)
+      window.plugin?.setSpeed?.(DEFAULT_SPEED)
+      apiSpeedApplied = Boolean(window.VLibrasPlayer || window.plugin?.setSpeed)
+    } catch {
+      apiSpeedApplied = false
+    }
+
+    const speedLabel = document.querySelector<HTMLElement>('.vpw-speed-default')
+
+    if (speedLabel?.textContent?.trim() === DEFAULT_SPEED_LABEL) {
+      return true
+    }
+
+    document.querySelector<HTMLElement>('.vpw-button-speed')?.click()
+
+    const fastOption =
+      document.querySelector<HTMLElement>('.vpw-block-speed-3')
+      ?? [...document.querySelectorAll<HTMLElement>('.vpw-block-speed')]
+        .find((option) => option.textContent?.trim() === DEFAULT_SPEED_LABEL)
+
+    fastOption?.click()
+
+    if (speedLabel) {
+      speedLabel.textContent = DEFAULT_SPEED_LABEL
+    }
+
+    return Boolean(fastOption || apiSpeedApplied)
+  }, [])
+
+  const scheduleDefaultSpeed = useCallback(() => {
+    if (speedTimer.current) {
+      window.clearTimeout(speedTimer.current)
+    }
+
+    speedAttempts.current = 0
+
+    const run = () => {
+      speedAttempts.current += 1
+
+      if (applyDefaultSpeed() || speedAttempts.current >= SPEED_RETRY_COUNT) {
+        speedTimer.current = null
+        return
+      }
+
+      speedTimer.current = window.setTimeout(run, SPEED_RETRY_MS)
+    }
+
+    run()
+  }, [applyDefaultSpeed])
 
   const bootWidget = useCallback(() => {
     if (!window.VLibras) {
@@ -73,8 +204,9 @@ export default function VLibras({ text }: VLibrasProps) {
       window.onload.call(window, new Event('load'))
     }
 
+    scheduleDefaultSpeed()
     return true
-  }, [])
+  }, [scheduleDefaultSpeed])
 
   const openWidget = useCallback(() => {
     bootWidget()
@@ -91,25 +223,30 @@ export default function VLibras({ text }: VLibrasProps) {
     }
 
     window.setTimeout(centerWidget, CENTER_WIDGET_DELAY_MS)
+    window.setTimeout(scheduleDefaultSpeed, CENTER_WIDGET_DELAY_MS)
     return true
-  }, [bootWidget, centerWidget])
+  }, [bootWidget, centerWidget, scheduleDefaultSpeed])
 
-  const performTranslation = useCallback(
-    (textoAtual: string) => {
-      if (!textoAtual) {
-        return false
+  const translateNext = useCallback(
+    () => {
+      if (translating.current) {
+        return true
       }
 
-      if (!openWidget()) {
-        return false
+      const nextText = queue.current.shift()
+
+      if (!nextText) {
+        return true
       }
 
-      if (typeof window.plugin?.translate !== 'function') {
+      if (!openWidget() || typeof window.plugin?.translate !== 'function') {
+        queue.current.unshift(nextText)
         return false
       }
 
       translating.current = true
-      window.plugin.translate(textoAtual)
+      applyDefaultSpeed()
+      window.plugin.translate(nextText)
       centerWidget()
 
       if (translateTimer.current) {
@@ -119,36 +256,44 @@ export default function VLibras({ text }: VLibrasProps) {
       translateTimer.current = window.setTimeout(() => {
         translating.current = false
         translateTimer.current = null
-
-        const next = pendingText.current
-        pendingText.current = null
-
-        if (next && next !== textoAtual) {
-          performTranslation(next)
-        }
-      }, TRANSLATE_COMPLETE_MS)
+        translateNextRef.current()
+      }, estimateTranslationTime(nextText))
 
       return true
     },
-    [centerWidget, openWidget],
+    [applyDefaultSpeed, centerWidget, estimateTranslationTime, openWidget],
+  )
+
+  useEffect(() => {
+    translateNextRef.current = translateNext
+  }, [translateNext])
+
+  const enqueueTranslation = useCallback(
+    (textoAtual: string) => {
+      if (!textoAtual) {
+        return false
+      }
+
+      if (textoAtual === lastQueuedText.current) {
+        return translateNext()
+      }
+
+      lastQueuedText.current = textoAtual
+      queue.current.push(textoAtual)
+      return translateNext()
+    },
+    [translateNext],
   )
 
   const triggerTranslation = useCallback(() => {
     const textoAtual = text.trim()
 
-    if (!textoAtual || textoAtual === lastTriggeredText.current) {
+    if (!textoAtual) {
       return false
     }
 
-    lastTriggeredText.current = textoAtual
-
-    if (translating.current) {
-      pendingText.current = textoAtual
-      return false
-    }
-
-    return performTranslation(textoAtual)
-  }, [performTranslation, text])
+    return enqueueTranslation(textoAtual)
+  }, [enqueueTranslation, text])
 
   useEffect(() => {
     if (initialized.current) {
@@ -165,6 +310,7 @@ export default function VLibras({ text }: VLibrasProps) {
       bootWidget()
       readyTimer.current = window.setTimeout(openWidget, 1600)
       window.setTimeout(centerWidget, 2200)
+      window.setTimeout(scheduleDefaultSpeed, 2400)
     }
 
     const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null
@@ -188,13 +334,21 @@ export default function VLibras({ text }: VLibrasProps) {
       if (readyTimer.current) {
         window.clearTimeout(readyTimer.current)
       }
+
+      if (translateTimer.current) {
+        window.clearTimeout(translateTimer.current)
+      }
+
+      if (speedTimer.current) {
+        window.clearTimeout(speedTimer.current)
+      }
     }
-  }, [bootWidget, centerWidget, openWidget])
+  }, [bootWidget, centerWidget, openWidget, scheduleDefaultSpeed])
 
   useEffect(() => {
     const textoAtual = text.trim()
 
-    if (!textoAtual || textoAtual === lastTriggeredText.current) {
+    if (!textoAtual || textoAtual === lastQueuedText.current) {
       return
     }
 
@@ -220,7 +374,7 @@ export default function VLibras({ text }: VLibrasProps) {
 
   const rootProps: VLibrasElementProps = {
     vw: ' ',
-    className: 'enabled vlibras-widget',
+    className: 'enabled',
   }
 
   const accessButtonProps: VLibrasElementProps = {
@@ -230,7 +384,6 @@ export default function VLibras({ text }: VLibrasProps) {
 
   const wrapperProps: VLibrasElementProps = {
     'vw-plugin-wrapper': ' ',
-    className: 'vlibras-center-wrapper',
   }
 
   return (
