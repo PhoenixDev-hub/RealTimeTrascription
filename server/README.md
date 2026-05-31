@@ -23,14 +23,14 @@ Aplicação de transcrição de áudio em tempo real em português, utilizando A
 ### Backend (Python)
 ```bash
 cd server
-python3 -m venv venv    
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ### Frontend (React)
 ```bash
-cd client/DualLibras.AI
+cd client
 npm install
 ```
 
@@ -61,7 +61,7 @@ python main.py
 
 ### Iniciar Frontend
 ```bash
-cd client/DualLibras.AI
+cd client
 npm run dev
 ```
 
@@ -78,21 +78,22 @@ Abra o navegador em `http://localhost:5173`
 ## Estrutura do Projeto
 
 ```
-├── server/                    # Backend Python
-│   ├── main.py               # Servidor FastAPI com WebSocket
-│   ├── RealTimeAudioTranscription.py  # Lógica de transcrição
-│   ├── RealTimeTest.py       # Versão de teste
-│   ├── Configure.py          # Configuração da API
-│   ├── requirements.txt      # Dependências Python
-│   └── .env                  # Chave da API (não versionado)
-├── client/DualLibras.AI/     # Frontend React
+├── server/
+│   ├── app/
+│   │   ├── api.py
+│   │   ├── config.py
+│   │   └── transcription.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── .env
+├── client/
 │   ├── src/
-│   │   ├── App.tsx          # Componente principal
+│   │   ├── App.tsx
 │   │   ├── components/
-│   │   │   └── VLibras.tsx  # Integração com VLibras
+│   │   │   └── VLibras.tsx
 │   │   └── services/
-│   │       └── websocket.ts # Comunicação WebSocket
-│   └── package.json         # Dependências Node.js
+│   │       └── websocket.ts
+│   └── package.json
 ```
 
 ## APIs Utilizadas
@@ -106,7 +107,7 @@ Abra o navegador em `http://localhost:5173`
 ### Testes
 - Endpoint de saúde: `GET /health`
 - Envio de mensagem de teste: `POST /test-message`
-- WebSocket: `ws://localhost:8888/ws`
+- WebSocket: `ws://localhost:5455/ws`
 
 ### Logs
 Os logs são exibidos no terminal do backend, mostrando:

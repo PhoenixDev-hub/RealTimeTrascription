@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import VLibras from './components/VLibras'
+import simplifyText from './services/simplify'
 import transcriptSocket from './services/websocket'
 
 const CONTENT_ID = 'conteudo-libras'
@@ -31,6 +32,7 @@ function App() {
   }, [])
 
   const textoParaLibras = (texto || textoFinal).trim()
+  const textoParaLibrasSimplificado = simplifyText(textoParaLibras)
   const textoExibido = textoParaLibras || 'Aguardando fala...'
   const statusLegenda = temErro
     ? 'Erro na transcrição'
@@ -40,9 +42,10 @@ function App() {
         ? 'Legenda ao vivo'
         : 'Pronto para ouvir'
 
+        console.log('simplificado:', {textoParaLibrasSimplificado})
   return (
     <main className="app-shell">
-      <VLibras text={textoParaLibras} targetId={CONTENT_ID} />
+      <VLibras text={textoParaLibrasSimplificado} />
 
       <section className="status-panel" aria-label="Status da transcrição">
         <div className="status-line">

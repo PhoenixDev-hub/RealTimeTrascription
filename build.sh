@@ -18,7 +18,7 @@ docker build -t duallibras-backend:latest ./server
 
 # Build Frontend
 echo -e "${BLUE} Building frontend...${NC}"
-docker build -t duallibras-frontend:latest ./client/DualLibras.AI
+docker build -t duallibras-frontend:latest ./client
 
 echo ""
 echo -e "${GREEN} Build completo!${NC}"

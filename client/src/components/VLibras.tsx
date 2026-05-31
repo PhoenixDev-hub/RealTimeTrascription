@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef } from 'react'
 
 type VLibrasProps = {
   text: string
-  targetId: string
 }
 
 type VLibrasElementProps = HTMLAttributes<HTMLDivElement> & {
@@ -27,15 +26,19 @@ declare global {
 
 const SCRIPT_ID = 'vlibras-widget-script'
 const SCRIPT_SRC = 'https://vlibras.gov.br/app/vlibras-plugin.js'
-const TRANSLATE_DELAY_MS = 450
-const READY_RETRY_MS = 500
+const TRANSLATE_DELAY_MS = 220
+const READY_RETRY_MS = 300
+const TRANSLATE_COMPLETE_MS = 900
 const MAX_TRANSLATE_ATTEMPTS = 24
 const CENTER_WIDGET_DELAY_MS = 250
 
-export default function VLibras({ text, targetId }: VLibrasProps) {
+export default function VLibras({ text }: VLibrasProps) {
   const initialized = useRef(false)
   const lastTriggeredText = useRef('')
   const readyTimer = useRef<number | null>(null)
+  const translating = useRef(false)
+  const pendingText = useRef<string | null>(null)
+  const translateTimer = useRef<number | null>(null)
 
   const centerWidget = useCallback(() => {
     const root = document.querySelector<HTMLElement>('[vw].enabled')
@@ -91,26 +94,61 @@ export default function VLibras({ text, targetId }: VLibrasProps) {
     return true
   }, [bootWidget, centerWidget])
 
+  const performTranslation = useCallback(
+    (textoAtual: string) => {
+      if (!textoAtual) {
+        return false
+      }
+
+      if (!openWidget()) {
+        return false
+      }
+
+      if (typeof window.plugin?.translate !== 'function') {
+        return false
+      }
+
+      translating.current = true
+      window.plugin.translate(textoAtual)
+      centerWidget()
+
+      if (translateTimer.current) {
+        window.clearTimeout(translateTimer.current)
+      }
+
+      translateTimer.current = window.setTimeout(() => {
+        translating.current = false
+        translateTimer.current = null
+
+        const next = pendingText.current
+        pendingText.current = null
+
+        if (next && next !== textoAtual) {
+          performTranslation(next)
+        }
+      }, TRANSLATE_COMPLETE_MS)
+
+      return true
+    },
+    [centerWidget, openWidget],
+  )
+
   const triggerTranslation = useCallback(() => {
     const textoAtual = text.trim()
 
-    if (!textoAtual) {
+    if (!textoAtual || textoAtual === lastTriggeredText.current) {
       return false
     }
 
-    if (!openWidget()) {
+    lastTriggeredText.current = textoAtual
+
+    if (translating.current) {
+      pendingText.current = textoAtual
       return false
     }
 
-    if (typeof window.plugin?.translate !== 'function') {
-      return false
-    }
-
-    window.plugin.translate(textoAtual)
-    centerWidget()
-
-    return true
-  }, [centerWidget, openWidget, text])
+    return performTranslation(textoAtual)
+  }, [performTranslation, text])
 
   useEffect(() => {
     if (initialized.current) {
@@ -160,7 +198,6 @@ export default function VLibras({ text, targetId }: VLibrasProps) {
       return
     }
 
-    lastTriggeredText.current = textoAtual
     let attempt = 0
     let timer: number
 
@@ -179,7 +216,7 @@ export default function VLibras({ text, targetId }: VLibrasProps) {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [targetId, text, triggerTranslation])
+  }, [text, triggerTranslation])
 
   const rootProps: VLibrasElementProps = {
     vw: ' ',

@@ -11,9 +11,9 @@
 
 ```
 .
-├── client/
-│   └── DualLibras.AI/        # Frontend React/Vite + TypeScript
-├── server/                   # Backend FastAPI + Whisper IA
+├── client/                  # Frontend React/Vite + TypeScript
+├── server/                   # Backend FastAPI + transcrição IA
+│   └── app/                  # API, configuração e transcrição
 └── docker-compose.yml        # Orquestração (opcional)
 ```
 
@@ -50,7 +50,7 @@ docker-compose down
 ### Frontend
 
 ```bash
-cd client/DualLibras.AI
+cd client
 npm install
 npm run dev
 ```

@@ -41,7 +41,7 @@ echo ""
 
 # Setup Frontend
 echo -e "${YELLOW} Setup Frontend...${NC}"
-cd "$SCRIPT_DIR/client/DualLibras.AI"
+cd "$SCRIPT_DIR/client"
 
 if [ ! -d "node_modules" ]; then
     echo "Instalando dependências..."
@@ -65,6 +65,6 @@ echo -e "    ${BLUE}venv\\Scripts\\activate${NC}     # Windows"
 echo -e "    ${BLUE}python main.py${NC}"
 echo ""
 echo "  Frontend:"
-echo "    cd $SCRIPT_DIR/client/DualLibras.AI"
+echo "    cd $SCRIPT_DIR/client"
 echo -e "    ${BLUE}npm run dev${NC}"
 echo ""

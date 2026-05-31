@@ -34,6 +34,10 @@ class TranscriptSocket {
   private transcriptCache: TranscriptMessage[] = []
   private lastCachedMessage: TranscriptMessage | null = null
 
+  constructor() {
+    this.loadTranscriptCache()
+  }
+
   connect() {
     if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
       console.debug('[WebSocket] Conexão já ativa')
