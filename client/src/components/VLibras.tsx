@@ -60,7 +60,11 @@ export default function VLibras({ text, onStatusChange }: VLibrasProps) {
   const lastQueuedText = useRef('')
   const translateTimer = useRef<number | null>(null)
   const translateNextRef = useRef<() => boolean>(() => true)
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'translating' | 'error' | 'ready'>('idle')
+
+  useEffect(() => {
+    console.debug('[VLibras] Status:', status)
+  }, [status])
 
   const estimateTranslationTime = useCallback((value: string) => {
     const words = value.split(/\s+/).filter(Boolean).length
@@ -150,6 +154,7 @@ export default function VLibras({ text, onStatusChange }: VLibrasProps) {
       window.VLibrasPlayer?.setSpeed?.(DEFAULT_SPEED)
       window.plugin?.setSpeed?.(DEFAULT_SPEED)
     } catch {
+      // Ignore errors when setting speed
     }
     return true
   }, [])
@@ -206,8 +211,7 @@ export default function VLibras({ text, onStatusChange }: VLibrasProps) {
     window.setTimeout(scheduleDefaultSpeed, CENTER_WIDGET_DELAY_MS)
     return true
   }, [bootWidget, centerWidget, scheduleDefaultSpeed])
-
-  const waitForPlugin = useCallback((callback: () => void, attempts = 0) => {
+  const waitForPlugin = useCallback(function waitForPlugin(callback: () => void, attempts = 0) {
     if (attempts >= 40) {
       onStatusChange?.('error')
       return
@@ -222,7 +226,6 @@ export default function VLibras({ text, onStatusChange }: VLibrasProps) {
       setTimeout(() => waitForPlugin(callback, attempts + 1), 150)
     }
   }, [onStatusChange])
-
   const translateNext = useCallback(() => {
     if (translating.current) return true
 

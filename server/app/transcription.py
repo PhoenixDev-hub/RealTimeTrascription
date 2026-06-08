@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import math
-import os
 import socket
 import sys
 import time
@@ -260,16 +259,20 @@ class TerminalTranscript:
             subtitle=f"Conectado há {self.stats.uptime()}",
         )
 
-    async def handle_turn(self, text: str, final: bool) -> None:
+    async def handle_turn(
+        self, text: str, final: bool, speaker_label: str | None = None
+    ) -> None:
         if final:
-            await self._final(text)
+            await self._final(text, speaker_label)
             return
 
         if text != self.partial_text:
-            await self._partial(text)
+            await self._partial(text, speaker_label)
 
-    async def _final(self, text: str) -> None:
-        speaker = classify_speaker(text)
+    async def _final(self, text: str, speaker_label: str | None = None) -> None:
+        speaker = (
+            f"Palestrante {speaker_label}" if speaker_label else classify_speaker(text)
+        )
         if self.live:
             self.live.stop()
         if console:
@@ -299,14 +302,20 @@ class TerminalTranscript:
         )
         self._reset()
 
-    async def _partial(self, text: str) -> None:
+    async def _partial(self, text: str, speaker_label: str | None = None) -> None:
         self.partial_text = text
         now = time.monotonic()
 
         if self._should_send_partial(text, now):
+            speaker = f"Palestrante {speaker_label}" if speaker_label else "Professor"
             await notify(
                 self.on_text,
-                {"type": "transcript", "text": text, "is_final": False},
+                {
+                    "type": "transcript",
+                    "text": text,
+                    "is_final": False,
+                    "speaker": speaker,
+                },
             )
             self.partial_sent = text
             self.partial_sent_at = now
@@ -379,6 +388,7 @@ def build_url(use_portuguese_prompt: bool) -> str:
         "sample_rate": SETTINGS.sample_rate,
         "speech_model": SETTINGS.speech_model,
         "include_partial_turns": "true",
+        "speaker_labels": "true",
     }
 
     if use_portuguese_prompt:
@@ -648,7 +658,10 @@ async def receive_transcripts(
             if message_type == "Turn":
                 text = message.get("transcript", "").strip()
                 if text:
-                    await terminal.handle_turn(text, bool(message.get("turn_is_done")))
+                    speaker_label = message.get("speaker")
+                    await terminal.handle_turn(
+                        text, bool(message.get("turn_is_done")), speaker_label
+                    )
                 continue
 
             if message_type in ("SessionBegins", "Begin"):
@@ -802,16 +815,11 @@ async def run_local_fallback(
         callback=audio_callback,
     ):
         local_data = bytearray()
-        while True:
-            data, _ = await read_audio(audio_buffer.queue)
-            local_data.extend(data)
-            if len(local_data) < SETTINGS.sample_rate * 2:
-                continue
 
+        def transcribe_audio(audio_bytes: bytes) -> list[str]:
             audio_np = (
-                np.frombuffer(local_data, dtype=np.int16).astype(np.float32) / 32768.0
+                np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
             )
-            local_data.clear()
             segments, _ = model.transcribe(
                 audio_np,
                 beam_size=1,
@@ -819,22 +827,65 @@ async def run_local_fallback(
                 word_timestamps=False,
                 vad_filter=True,
             )
-            for segment in segments:
-                text = segment.text.strip()
-                if not text:
-                    continue
-                speaker = classify_speaker(text)
-                if saver and SETTINGS.save_transcripts:
-                    saver.save_final(text, speaker)
-                await notify(
-                    on_text,
-                    {
-                        "type": "transcript",
-                        "text": text,
-                        "is_final": True,
-                        "speaker": speaker,
-                    },
-                )
+            return [
+                segment.text.strip() for segment in segments if segment.text.strip()
+            ]
+
+        while True:
+            try:
+                data, _ = await read_audio(audio_buffer.queue)
+                local_data.extend(data)
+
+                # Se acumulamos mais que 8 segundos de fala contínua, transcrevemos para manter a fluidez
+                if len(local_data) >= SETTINGS.sample_rate * 2 * 8:
+                    audio_chunk = bytes(local_data)
+                    local_data.clear()
+
+                    texts = await asyncio.to_thread(transcribe_audio, audio_chunk)
+                    for text in texts:
+                        speaker = classify_speaker(text)
+                        if saver and SETTINGS.save_transcripts:
+                            saver.save_final(text, speaker)
+                        await notify(
+                            on_text,
+                            {
+                                "type": "transcript",
+                                "text": text,
+                                "is_final": True,
+                                "speaker": speaker,
+                            },
+                        )
+            except RecoverableTranscriptionError:
+                # Ocorreu um silêncio longo (timeout de leitura).
+                # Transcrevemos o áudio restante acumulado até o momento.
+                if len(local_data) >= SETTINGS.sample_rate * 2 * 0.5:
+                    audio_chunk = bytes(local_data)
+                    local_data.clear()
+
+                    try:
+                        texts = await asyncio.to_thread(transcribe_audio, audio_chunk)
+                        for text in texts:
+                            speaker = classify_speaker(text)
+                            if saver and SETTINGS.save_transcripts:
+                                saver.save_final(text, speaker)
+                            await notify(
+                                on_text,
+                                {
+                                    "type": "transcript",
+                                    "text": text,
+                                    "is_final": True,
+                                    "speaker": speaker,
+                                },
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Erro ao transcrever no silêncio do fallback local: {e}"
+                        )
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"Erro inesperado no loop do fallback local: {e}")
+                await asyncio.sleep(1)
 
 
 def check_microphone(microphone: int) -> None:

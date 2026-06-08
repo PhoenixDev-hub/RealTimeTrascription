@@ -79,9 +79,14 @@ class TranscriptManager:
             )
 
             styles = getSampleStyleSheet()
+            font_name = "Helvetica"
+            if "CustomFont" in pdfmetrics.getRegisteredFontNames():
+                font_name = "CustomFont"
+
             title_style = ParagraphStyle(
                 "CustomTitle",
                 parent=styles["Heading1"],
+                fontName=font_name + "-Bold" if font_name == "Helvetica" else font_name,
                 fontSize=24,
                 textColor=colors.HexColor("#1a1a1a"),
                 spaceAfter=30,
@@ -91,17 +96,27 @@ class TranscriptManager:
             body_style = ParagraphStyle(
                 "CustomBody",
                 parent=styles["BodyText"],
+                fontName=font_name,
                 fontSize=11,
                 alignment=4,
                 spaceAfter=12,
                 leading=16,
             )
 
+            meta_style = ParagraphStyle(
+                "CustomMeta",
+                parent=styles["Normal"],
+                fontName=font_name,
+                fontSize=9,
+                textColor=colors.HexColor("#555555"),
+                spaceAfter=6,
+            )
+
             story = []
 
             story.append(Paragraph(title, title_style))
             timestamp = datetime.now().strftime("%d de %B de %Y às %H:%M")
-            story.append(Paragraph(f"<i>{timestamp}</i>", styles["Normal"]))
+            story.append(Paragraph(f"<i>{timestamp}</i>", meta_style))
             story.append(Spacer(1, 0.3 * inch))
 
             paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
@@ -111,11 +126,11 @@ class TranscriptManager:
                 story.append(Paragraph(cleaned, body_style))
 
             story.append(Spacer(1, 0.3 * inch))
-            story.append(Paragraph("—" * 50, styles["Normal"]))
+            story.append(Paragraph("—" * 50, meta_style))
             footer_text = (
                 f"Arquivo: {filename} | Gerado automaticamente pelo Festival 2026"
             )
-            story.append(Paragraph(f"<small>{footer_text}</small>", styles["Normal"]))
+            story.append(Paragraph(f"<small>{footer_text}</small>", meta_style))
 
             doc.build(story)
             logger.info(f"PDF salvo: {filepath}")

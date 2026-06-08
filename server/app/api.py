@@ -3,19 +3,19 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 try:
-    from server.app.transcript_manager import TranscriptManager
     from server.app.documentation_generator import DocumentationGenerator
+    from server.app.transcript_manager import TranscriptManager
 except ImportError:
-    from app.transcript_manager import TranscriptManager
     from app.documentation_generator import DocumentationGenerator
+    from app.transcript_manager import TranscriptManager
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -208,6 +208,14 @@ app = FastAPI(
     description="API de transcrição em tempo real para Libras",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -459,7 +467,7 @@ async def generate_documentation():
             "success": True,
             "message": "Documentação gerada com sucesso",
             "file": str(pdf_path),
-            "download_url": f"/documentation/download",
+            "download_url": "/documentation/download",
         }
     except Exception as e:
         logger.error(f"Erro ao gerar documentação: {e}", exc_info=True)

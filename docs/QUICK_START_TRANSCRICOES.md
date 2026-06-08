@@ -329,6 +329,6 @@ pip install -r server/requirements.txt
 ## 📞 Suporte
 
 Para problemas ou dúvidas, consulte:
-- [README.md](README.md) - Documentação completa
-- [transcript_manager.py](app/transcript_manager.py) - Código do gerenciador
-- [api.py](app/api.py) - Endpoints da API
+- [README.md](../README.md) - Documentação completa
+- [transcript_manager.py](../server/app/transcript_manager.py) - Código do gerenciador
+- [api.py](../server/app/api.py) - Endpoints da API

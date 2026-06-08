@@ -38,3 +38,9 @@ build/
 # Local data
 *.db
 *.sqlite
+
+# Application outputs and transcripts
+output/
+server/output/
+server/transcripts/*
+!server/transcripts/.gitkeep

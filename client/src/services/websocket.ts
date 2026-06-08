@@ -3,6 +3,7 @@ export type TranscriptMessage = {
   text: string
   isFinal: boolean
   error: boolean
+  speaker?: string
 }
 
 type OuvinteTranscricao = (mensagem: TranscriptMessage) => void
@@ -166,6 +167,7 @@ class SoqueteTranscricao {
         is_final?: unknown
         isFinal?: unknown
         error?: unknown
+        speaker?: unknown
       }
       const type = parsed.type === 'status' || parsed.type === 'error' ? parsed.type : 'transcript'
 
@@ -174,6 +176,7 @@ class SoqueteTranscricao {
         text: typeof parsed.text === 'string' ? parsed.text : '',
         isFinal: Boolean(parsed.is_final ?? parsed.isFinal),
         error: Boolean(parsed.error),
+        speaker: typeof parsed.speaker === 'string' ? parsed.speaker : undefined,
       }
     } catch (error) {
       console.error('[WebSocket] Erro ao parsear mensagem:', data, error)
@@ -210,6 +213,20 @@ class SoqueteTranscricao {
 
   getLastCachedMessage(): TranscriptMessage | null {
     return this.lastCachedMessage
+  }
+
+  getTranscriptCache(): TranscriptMessage[] {
+    return this.transcriptCache
+  }
+
+  clearTranscriptCache() {
+    this.transcriptCache = []
+    this.lastCachedMessage = null
+    try {
+      sessionStorage.removeItem('transcriptCache')
+    } catch (error) {
+      console.warn('[WebSocket] Erro ao limpar cache:', error)
+    }
   }
 }
 
