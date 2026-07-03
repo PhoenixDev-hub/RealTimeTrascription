@@ -428,7 +428,6 @@ def input_devices() -> list[tuple[int, dict[str, Any]]]:
         if device.get("max_input_channels", 0) > 0
     ]
 
-
 def print_audio_devices() -> None:
     devices = input_devices()
     if not devices:
