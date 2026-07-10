@@ -1,7 +1,7 @@
 try:
-    from server.app.api import app
+    from server.app.api.app import app
 except ImportError:
-    from app.api import app
+    from app.api.app import app
 
 if __name__ == "__main__":
     import os
