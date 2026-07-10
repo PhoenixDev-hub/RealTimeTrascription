@@ -1,14 +1,8 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Maximize,
   FolderOpen,
   Minimize,
-  Save,
-  FileText,
-  FileCode,
-  Settings as SettingsIcon,
-  FileDown,
-  Download,
   Mic,
   MicOff,
   AlertTriangle,
@@ -17,56 +11,21 @@ import {
   Volume2
 } from 'lucide-react'
 import VLibras from './components/VLibras'
+import { useAudioCapture } from './features/audio/useAudioCapture'
+import { HistoryPanel } from './features/history/HistoryPanel'
+import { useTranscriptHistory } from './features/history/useTranscriptHistory'
 import simplifyText from './services/simplify'
-import transcriptSocket, { parseTranscriptMessage } from './services/websocket'
+import transcriptSocket, { type TranscriptMessage } from './services/websocket'
 
 const CONTENT_ID = 'conteudo-libras'
-
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST ?? 'localhost'
-const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT ?? '5455'
-const API_BASE = import.meta.env.VITE_BACKEND_HTTP_URL ?? `http://${BACKEND_HOST}:${BACKEND_PORT}`
-const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? `ws://${BACKEND_HOST}:${BACKEND_PORT}/ws`
-
-type SavedGroup = {
-  id: string
-  dateStr: string
-  pdf?: string
-  txt?: string
-  json?: string
-}
-
-const formatFilenameDate = (timestamp: string) => {
-  try {
-    const parts = timestamp.split('_')
-    const datePart = parts[0]
-    const timePart = parts[1]
-    const year = datePart.substring(0, 4)
-    const month = datePart.substring(4, 6)
-    const day = datePart.substring(6, 8)
-    const hour = timePart.substring(0, 2)
-    const minute = timePart.substring(2, 4)
-    return `${day}/${month}/${year} às ${hour}:${minute}`
-  } catch {
-    return timestamp
-  }
-}
 
 function App() {
   const [texto, setTexto] = useState('')
   const [textoFinal, setTextoFinal] = useState('')
-  const [conectado, setConectado] = useState(false)
   const [traducaoFinal, setTraducaoFinal] = useState(false)
   const [temErro, setTemErro] = useState(false)
   const [vlibrasStatus, setVLibrasStatus] = useState<'idle' | 'loading' | 'translating' | 'error' | 'ready'>('loading')
-
-  // Estados para gerenciador de aulas
-  const [showPanel, setShowPanel] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [titulo, setTitulo] = useState('Aula de Acessibilidade')
-  const [savedGroups, setSavedGroups] = useState<SavedGroup[]>([])
   const [historicoTick, setHistoricoTick] = useState(0)
-  const [docGenerating, setDocGenerating] = useState(false)
-  const [docPath, setDocPath] = useState('')
   const [activeSpeaker, setActiveSpeaker] = useState('Professor')
   const [modoProjetor, setModoProjetor] = useState(false)
 
@@ -74,525 +33,66 @@ function App() {
     console.debug('[App] Histórico atualizado, tick:', historicoTick)
   }, [historicoTick])
 
-  // Novos estados da evolução: captura de áudio, VAD, WebRTC, latência
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [selectedDevice, setSelectedDevice] = useState<string>('')
-  const [capturing, setCapturing] = useState(false)
-  const [audioError, setAudioError] = useState<string>('')
-  const [audioLevel, setAudioLevel] = useState<number>(0)
-  const [speaking, setSpeaking] = useState(false)
-  const [latencyMs, setLatencyMs] = useState<number>(0)
-  const [latencyAlert, setLatencyAlert] = useState(false)
-  const [connectionMode, setConnectionMode] = useState<'assemblyai' | 'local' | 'offline'>('offline')
-  const [useVadGating, setUseVadGating] = useState<boolean>(true)
-  const useVadGatingRef = useRef<boolean>(true)
+  const handleTranscript = (message: TranscriptMessage) => {
+    setTexto(message.text)
+    setTraducaoFinal(message.isFinal)
+    setTemErro(message.error)
 
-  useEffect(() => {
-    useVadGatingRef.current = useVadGating
-    if (!useVadGating) {
-      speakingRef.current = true
-      setSpeaking(true)
-    } else {
-      speakingRef.current = speaking
+    if (message.speaker) {
+      setActiveSpeaker(message.speaker)
     }
-  }, [useVadGating, speaking])
 
-  // Refs de áudio e conexões
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const rnnoiseNodeRef = useRef<any>(null)
-  const encoderNodeRef = useRef<AudioWorkletNode | null>(null)
-  const vadRef = useRef<any>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
-  const rtcPcRef = useRef<RTCPeerConnection | null>(null)
-  const rtcDcRef = useRef<RTCDataChannel | null>(null)
-
-  const speakingRef = useRef<boolean>(false)
-  const lastSendTimeRef = useRef<number>(Date.now())
-
-  // Lista os dispositivos de áudio disponíveis
-  const carregarDispositivos = async () => {
-    try {
-      // Solicita permissão breve apenas para listar os nomes completos se necessário
-      await navigator.mediaDevices.getUserMedia({ audio: true })
-      const devs = await navigator.mediaDevices.enumerateDevices()
-      const audioDevs = devs.filter((d) => d.kind === 'audioinput')
-      setDevices(audioDevs)
-      if (audioDevs.length > 0) {
-        setSelectedDevice(audioDevs[0].deviceId)
-      }
-    } catch (err) {
-      console.warn('Erro ao obter permissão inicial ou listar dispositivos:', err)
-      // Tenta listar sem permissão (alguns navegadores ocultam labels)
-      navigator.mediaDevices.enumerateDevices()
-        .then((devs) => {
-          const audioDevs = devs.filter((d) => d.kind === 'audioinput')
-          setDevices(audioDevs)
-        })
-        .catch((e) => console.error('Erro geral ao enumerar dispositivos:', e))
+    if (message.isFinal && !message.error) {
+      setTextoFinal(message.text)
+      setHistoricoTick((tick) => tick + 1)
+      transcriptSocket.getTranscriptCache().push({
+        type: 'transcript',
+        text: message.text,
+        isFinal: true,
+        error: message.error,
+        speaker: message.speaker,
+      })
     }
   }
 
-  useEffect(() => {
-    carregarDispositivos()
-  }, [])
+  const {
+    conectado,
+    devices,
+    selectedDevice,
+    setSelectedDevice,
+    capturing,
+    audioError,
+    audioLevel,
+    speaking,
+    latencyMs,
+    latencyAlert,
+    connectionMode,
+    useVadGating,
+    setUseVadGating,
+    iniciarCaptura,
+    pararCaptura,
+  } = useAudioCapture({ onTranscript: handleTranscript })
 
-  // Conecta ao WebSocket do backend
-  const conectarSocket = () => {
-    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
-      return
-    }
-
-    console.log(`[WebSocket] Conectando ao backend em ${WS_URL}`)
-    const ws = new WebSocket(WS_URL)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      console.log('[WebSocket] Conectado ao backend')
-      setConectado(true)
-      negociarWebRTC()
-    }
-
-    ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data)
-
-        if (data.type === 'webrtc_answer') {
-          console.log('[WebRTC] Answer recebido do servidor')
-          if (rtcPcRef.current) {
-            await rtcPcRef.current.setRemoteDescription(
-              new RTCSessionDescription({
-                type: 'answer',
-                sdp: data.sdp,
-              })
-            )
-          }
-        } else if (data.type === 'status') {
-          setConnectionMode(data.mode || 'assemblyai')
-        } else if (data.type === 'transcript') {
-          const message = parseTranscriptMessage(data)
-          const rtt = Date.now() - lastSendTimeRef.current
-          setLatencyMs(rtt)
-          setLatencyAlert(rtt > 500)
-
-          setTexto(message.text)
-          setTraducaoFinal(message.isFinal)
-          setTemErro(message.error)
-
-          if (message.speaker) {
-            setActiveSpeaker(message.speaker)
-          }
-
-          if (message.isFinal && !message.error) {
-            setTextoFinal(message.text)
-            setHistoricoTick((tick) => tick + 1)
-
-            // Põe a transcrição no cache para permitir salvar
-            transcriptSocket.getTranscriptCache().push({
-              type: 'transcript',
-              text: message.text,
-              isFinal: true,
-              error: message.error,
-              speaker: message.speaker,
-            })
-          }
-        }
-      } catch (err) {
-        console.error('[WebSocket] Erro ao parsear mensagem:', err)
-      }
-    }
-
-    ws.onerror = (err) => {
-      console.error('[WebSocket] Erro:', err)
-    }
-
-    ws.onclose = () => {
-      console.warn('[WebSocket] Conexão fechada. Reconectando em 2s...')
-      setConectado(false)
-      setConnectionMode('offline')
-
-      // Limpa WebRTC
-      if (rtcPcRef.current) {
-        rtcPcRef.current.close()
-        rtcPcRef.current = null
-      }
-      rtcDcRef.current = null
-
-      setTimeout(conectarSocket, 2000)
-    }
-  }
-
-  // Estabelece canal WebRTC para latência ultrabaixa
-  const negociarWebRTC = async () => {
-    try {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
-      })
-      rtcPcRef.current = pc
-
-      // Cria canal de dados rápido e não ordenado (UDP-like)
-      const dc = pc.createDataChannel('audio', { ordered: false, maxRetransmits: 0 })
-      rtcDcRef.current = dc
-
-      dc.onopen = () => {
-        console.log('[WebRTC] Data Channel aberto com sucesso!')
-      }
-
-      dc.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data.type === 'transcript') {
-            const message = parseTranscriptMessage(data)
-            const rtt = Date.now() - lastSendTimeRef.current
-            setLatencyMs(rtt)
-            setLatencyAlert(rtt > 500)
-
-            setTexto(message.text)
-            setTraducaoFinal(message.isFinal)
-            setTemErro(message.error)
-            if (message.speaker) {
-              setActiveSpeaker(message.speaker)
-            }
-            if (message.isFinal && !message.error) {
-              setTextoFinal(message.text)
-              setHistoricoTick((tick) => tick + 1)
-
-              transcriptSocket.getTranscriptCache().push({
-                type: 'transcript',
-                text: message.text,
-                isFinal: true,
-                error: message.error,
-                speaker: message.speaker,
-              })
-            }
-          }
-        } catch (e) {
-          console.error('[WebRTC] Erro no parsing de dados:', e)
-        }
-      }
-
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
-
-      // Aguarda o gathering de ICE completar antes de enviar o offer (Vanilla ICE)
-      await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === 'complete') {
-          resolve()
-        } else {
-          const checkState = () => {
-            console.log('[WebRTC] ICE Gathering State:', pc.iceGatheringState)
-            if (pc.iceGatheringState === 'complete') {
-              pc.removeEventListener('icegatheringstatechange', checkState)
-              resolve()
-            }
-          }
-          pc.addEventListener('icegatheringstatechange', checkState)
-          // Timeout de segurança
-          setTimeout(() => {
-            pc.removeEventListener('icegatheringstatechange', checkState)
-            resolve()
-          }, 5000)
-        }
-      })
-
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: 'webrtc_offer',
-            sdp: pc.localDescription?.sdp || offer.sdp,
-          })
-        )
-      }
-    } catch (err) {
-      console.error('[WebRTC] Erro na negociação:', err)
-    }
-  }
-
-  // Inicia captura de áudio no frontend
-  const iniciarCaptura = async () => {
-    try {
-      setAudioError('')
-
-      // Conecta o WebSocket se necessário
-      conectarSocket()
-
-      // 1. getUserMedia com os constraints de latência e ruído solicitados
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: selectedDevice ? { exact: selectedDevice } : undefined,
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          latency: 0.01,
-        } as any,
-      })
-      streamRef.current = stream
-
-      // 2. AudioContext a 16 kHz para mono de baixa latência
-      const ctx = new AudioContext({ sampleRate: 16000 })
-      audioContextRef.current = ctx
-
-      // 3. Registra o nó simple-rnnoise-wasm carregando os assets locais
-      // @ts-ignore
-      const { RNNoiseNode, rnnoise_loadAssets } = await import('simple-rnnoise-wasm')
-      const assets = await rnnoise_loadAssets({
-        scriptSrc: '/rnnoise.worklet.js',
-        moduleSrc: '/rnnoise.wasm',
-      })
-      await RNNoiseNode.register(ctx, assets)
-
-      // 4. Carrega o processador de PCM em thread separada
-      await ctx.audioWorklet.addModule('/pcm-encoder-worklet.js')
-
-      // 5. Configura grafo de Web Audio
-      const source = ctx.createMediaStreamSource(stream)
-      const rnnoiseNode = new RNNoiseNode(ctx)
-      rnnoiseNodeRef.current = rnnoiseNode
-
-      const encoderNode = new AudioWorkletNode(ctx, 'pcm-encoder')
-      encoderNodeRef.current = encoderNode
-
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 256
-      analyserRef.current = analyser
-
-      // Conectando os nós: source -> rnnoise -> encoder & analyser
-      source.connect(rnnoiseNode)
-      rnnoiseNode.connect(encoderNode)
-      rnnoiseNode.connect(analyser)
-
-      // Mantém ativo conectando ao destino do contexto
-      encoderNode.connect(ctx.destination)
-
-      // 6. Recebe chunks PCM 16-bit e envia via WebRTC / WebSocket
-      encoderNode.port.onmessage = (event) => {
-        if (event.data.type === 'audio') {
-          const buffer = event.data.buffer
-
-          // Envia se VAD estiver desativado OU se houver fala ativa detectada
-          if (!useVadGatingRef.current || speakingRef.current) {
-            lastSendTimeRef.current = Date.now()
-
-            if (rtcDcRef.current && rtcDcRef.current.readyState === 'open') {
-              rtcDcRef.current.send(buffer)
-            } else if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(buffer)
-            }
-          }
-        }
-      }
-
-      // 7. Envia o áudio limpo para o VAD do Ricky
-      try {
-        const dest = ctx.createMediaStreamDestination()
-        rnnoiseNode.connect(dest)
-
-        const { MicVAD } = await import('@ricky0123/vad-web')
-        const myvad = await MicVAD.new({
-          audioContext: ctx,
-          getStream: () => Promise.resolve(dest.stream),
-          baseAssetPath: '/',
-          onnxWASMBasePath: '/',
-          positiveSpeechThreshold: 0.35, // Mais sensível para voz baixa
-          onSpeechStart: () => {
-            setSpeaking(true)
-            speakingRef.current = true
-          },
-          onSpeechEnd: () => {
-            setSpeaking(false)
-            speakingRef.current = false
-          },
-        })
-        vadRef.current = myvad
-        await myvad.start()
-      } catch (vadErr) {
-        console.warn('VAD falhou ao iniciar. Usando envio contínuo como fallback.', vadErr)
-        setSpeaking(true)
-        speakingRef.current = true
-      }
-
-      // 8. Loop de animação do medidor de volume do microfone
-      const bufferLength = analyser.frequencyBinCount
-      const dataArray = new Uint8Array(bufferLength)
-      const updateLevel = () => {
-        if (!analyserRef.current || !streamRef.current) return
-        analyserRef.current.getByteFrequencyData(dataArray)
-        let sum = 0
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i]
-        }
-        setAudioLevel(sum / bufferLength)
-        requestAnimationFrame(updateLevel)
-      }
-      updateLevel()
-
-      setCapturing(true)
-    } catch (err: any) {
-      console.error('Falha ao iniciar captura de áudio:', err)
-      // Tratamento de erros amigável de permissão de microfone
-      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
-        setAudioError('Permissão negada. Conceda acesso ao microfone nas configurações do navegador.')
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setAudioError('Microfone não encontrado. Conecte um dispositivo de entrada.')
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        setAudioError('Microfone ocupado por outra aplicação.')
-      } else {
-        setAudioError(`Erro no áudio: ${err.message || err.name}`)
-      }
-    }
-  }
-
-  // Para a captura de áudio e limpa recursos
-  const pararCaptura = async () => {
-    setCapturing(false)
-    setSpeaking(false)
-    speakingRef.current = false
-    setAudioLevel(0)
-
-    if (vadRef.current) {
-      await vadRef.current.destroy()
-      vadRef.current = null
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
-
-    if (audioContextRef.current) {
-      await audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-
-    rnnoiseNodeRef.current = null
-    encoderNodeRef.current = null
-    analyserRef.current = null
-  }
-
-  // Limpa conexões WebSocket ao desmontar
-  useEffect(() => {
-    conectarSocket()
-    return () => {
-      pararCaptura()
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
-    }
-  }, [])
-
-  const carregarHistoricoSalvo = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/transcripts`)
-      if (!response.ok) throw new Error('Erro ao listar arquivos')
-      const data = (await response.json()) as {
-        total: number
-        pdfs: string[]
-        texts: string[]
-        metadata: string[]
-      }
-
-      const groupsMap = new Map<string, Partial<SavedGroup>>()
-      const getGroupId = (filename: string) => {
-        const match = filename.match(/transcricao_(\d{8}_\d{6})/)
-        return match ? match[1] : filename.split('.')[0]
-      }
-
-      data.pdfs.forEach((pdf) => {
-        const id = getGroupId(pdf)
-        if (!groupsMap.has(id)) groupsMap.set(id, { id })
-        groupsMap.get(id)!.pdf = pdf
-      })
-
-      data.texts.forEach((txt) => {
-        const id = getGroupId(txt)
-        if (!groupsMap.has(id)) groupsMap.set(id, { id })
-        groupsMap.get(id)!.txt = txt
-      })
-
-      data.metadata.forEach((meta) => {
-        const id = getGroupId(meta)
-        if (!groupsMap.has(id)) groupsMap.set(id, { id })
-        groupsMap.get(id)!.json = meta
-      })
-
-      const list: SavedGroup[] = []
-      groupsMap.forEach((val, key) => {
-        list.push({
-          id: key,
-          dateStr: formatFilenameDate(key),
-          pdf: val.pdf,
-          txt: val.txt,
-          json: val.json,
-        })
-      })
-
-      list.sort((a, b) => b.id.localeCompare(a.id))
-      setSavedGroups(list)
-    } catch (error) {
-      console.error('Falha ao carregar histórico salvo:', error)
-    }
-  }
-
-  const salvarAula = async () => {
-    const cache = transcriptSocket.getTranscriptCache()
-    if (cache.length === 0) {
-      alert('Não há transcrição acumulada para salvar nesta sessão.')
-      return
-    }
-
-    const fullText = cache
-      .map((msg) => `${msg.speaker || 'Palestrante'}: ${msg.text}`)
-      .join('\n\n')
-
-    setIsSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/save-transcript`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: fullText,
-          title: titulo,
-          formats: ['pdf', 'txt', 'json'],
-          metadata: {
-            evento: 'Festival 2026',
-            origem: 'Interface Web',
-            total_sentencas: cache.length,
-          },
-        }),
-      })
-
-      if (!response.ok) throw new Error('Erro ao salvar transcrição')
-
-      alert('Aula salva com sucesso!')
-      carregarHistoricoSalvo()
-    } catch (error) {
-      console.error(error)
-      alert('Falha ao salvar a transcrição.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const gerarDocumentacao = async () => {
-    setDocGenerating(true)
-    try {
-      const response = await fetch(`${API_BASE}/documentation/generate`)
-      if (!response.ok) throw new Error('Erro ao gerar documento')
-      const data = await response.json()
-      setDocPath(data.file)
-      alert('Documentação PDF gerada com sucesso!')
-    } catch (error) {
-      console.error(error)
-      alert('Falha ao gerar documentação.')
-    } finally {
-      setDocGenerating(false)
-    }
-  }
+  const {
+    showPanel,
+    setShowPanel,
+    isSaving,
+    titulo,
+    setTitulo,
+    savedGroups,
+    docGenerating,
+    docPath,
+    abrirPainel,
+    salvarAula,
+    limparTranscricaoAtual,
+    gerarDocumentacao,
+  } = useTranscriptHistory({
+    onClearCurrentTranscript: () => {
+      setTexto('')
+      setTextoFinal('')
+      setHistoricoTick((tick) => tick + 1)
+    },
+  })
 
   const textoBase = useMemo(() => {
     const raw = (texto || textoFinal).trim()
@@ -715,12 +215,7 @@ function App() {
             <Volume2 className="w-3.5 h-3.5 text-[#82E3FF]" />
             <select
               value={selectedDevice}
-              onChange={(e) => {
-                setSelectedDevice(e.target.value)
-                if (capturing) {
-                  pararCaptura().then(() => iniciarCaptura())
-                }
-              }}
+              onChange={(e) => setSelectedDevice(e.target.value)}
               className="bg-transparent text-[#F2F6FF] border-none outline-none font-bold cursor-pointer max-w-[120px] sm:max-w-[180px]"
             >
               {devices.map((d) => (
@@ -819,10 +314,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => {
-              setShowPanel(true)
-              carregarHistoricoSalvo()
-            }}
+            onClick={abrirPainel}
             className="flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#82E3FF]/30 bg-[#145DFF]/20 px-3 py-2 text-xs font-bold text-[#82E3FF] transition-all hover:bg-[#145DFF]/40 sm:min-h-[34px]"
           >
             <FolderOpen className="w-4 h-4" /> Histórico
@@ -843,135 +335,19 @@ function App() {
         </div>
       )}
 
-      {/* PAINEL LATERAL DE HISTÓRICO */}
-      <div
-        className={`fixed inset-y-0 right-0 z-50 flex w-[min(90vw,440px)] flex-col border-l border-[#82E3FF]/20 bg-[#020B2B]/95 p-6 shadow-[0_0_50px_rgba(20,93,255,0.25)] backdrop-blur-md transition-transform duration-300 ${
-          showPanel ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-[#82E3FF]/20 pb-4">
-          <h2 className="text-lg font-black text-[#F2F6FF]">Gerenciador de Aulas</h2>
-          <button
-            onClick={() => setShowPanel(false)}
-            className="cursor-pointer text-sm font-bold text-[#B7C8EF] hover:text-[#82E3FF]"
-          >
-            Fechar ✕
-          </button>
-        </div>
-
-        {/* SEÇÃO SALVAR AULA */}
-        <div className="mt-6 border-b border-[#82E3FF]/10 pb-6">
-          <h3 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#82E3FF]">Salvar Transcrição Atual</h3>
-          <div className="flex flex-col gap-3">
-            <input
-              type="text"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Título da Aula"
-              className="w-full rounded-lg border border-[#82E3FF]/25 bg-black/40 px-3 py-2 text-sm text-[#F2F6FF] outline-none focus:border-[#82E3FF] focus:shadow-[0_0_8px_rgba(130,227,255,0.4)]"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={salvarAula}
-                disabled={isSaving}
-                className="flex flex-1 items-center justify-center gap-2 cursor-pointer rounded-lg bg-gradient-to-r from-[#145DFF] to-[#82E3FF] py-2 text-xs font-black text-black hover:opacity-90 disabled:opacity-50"
-              >
-                {isSaving ? 'Salvando...' : <><Save className="w-4 h-4" /> Salvar Aula</>}
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm('Tem certeza que deseja limpar a transcrição atual?')) {
-                    transcriptSocket.clearTranscriptCache()
-                    setTexto('')
-                    setTextoFinal('')
-                    setHistoricoTick(t => t + 1)
-                  }
-                }}
-                className="cursor-pointer rounded-lg border border-[#2F7BFF]/30 bg-[#2F7BFF]/10 px-3 py-2 text-xs font-bold text-[#B7C8EF] hover:bg-[#2F7BFF]/20"
-              >
-                Limpar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* SEÇÃO LISTA HISTÓRICO */}
-        <div className="mt-6 flex flex-1 flex-col overflow-hidden mb-24">
-          <h3 className="mb-3 text-xs font-extrabold uppercase tracking-wider text-[#82E3FF]">Histórico de Arquivos</h3>
-
-          <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3">
-            {savedGroups.length === 0 ? (
-              <p className="text-xs text-[#B7C8EF] italic">Nenhuma aula salva no servidor.</p>
-            ) : (
-              savedGroups.map(group => (
-                <div key={group.id} className="rounded-lg border border-[#82E3FF]/10 bg-black/20 p-3 flex flex-col gap-2">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-[#F2F6FF]">
-                      {group.pdf ? group.pdf.replace('transcricao_', '').replace('.pdf', '') : group.id}
-                    </span>
-                    <span className="text-[10px] text-[#B7C8EF]">{group.dateStr}</span>
-                  </div>
-                  <div className="flex gap-1.5 mt-1">
-                    {group.pdf && (
-                      <a
-                        href={`${API_BASE}/transcripts/download/${group.pdf}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 rounded bg-[#82E3FF]/10 border border-[#82E3FF]/30 px-2 py-1 text-[10px] font-bold text-[#82E3FF] hover:bg-[#82E3FF]/20"
-                      >
-                        <FileText className="w-3 h-3" /> PDF
-                      </a>
-                    )}
-                    {group.txt && (
-                      <a
-                        href={`${API_BASE}/transcripts/download/${group.txt}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 rounded bg-[#2F7BFF]/10 border border-[#2F7BFF]/30 px-2 py-1 text-[10px] font-bold text-[#53B8FF] hover:bg-[#2F7BFF]/20"
-                      >
-                        <FileCode className="w-3 h-3" /> TXT
-                      </a>
-                    )}
-                    {group.json && (
-                      <a
-                        href={`${API_BASE}/transcripts/download/${group.json}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-[10px] font-bold text-[#B7C8EF] hover:bg-gray-700"
-                      >
-                        <SettingsIcon className="w-3 h-3" /> JSON
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* SEÇÃO GERAR DOCUMENTO PROJETO */}
-        <div className="absolute bottom-6 left-6 right-6 border-t border-[#82E3FF]/10 pt-4">
-          <button
-            onClick={gerarDocumentacao}
-            disabled={docGenerating}
-            className="flex w-full items-center justify-center gap-2 cursor-pointer rounded-lg border border-[#82E3FF]/30 bg-transparent py-2.5 text-xs font-extrabold text-[#82E3FF] hover:bg-[#82E3FF]/10"
-          >
-            {docGenerating ? 'Gerando Documentação...' : <><FileDown className="w-4 h-4" /> Gerar PDF de Documentação</>}
-          </button>
-          {docPath && (
-            <div className="mt-2 text-center">
-              <a
-                href={`${API_BASE}/documentation/download`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] font-bold text-green-300 hover:underline"
-              >
-                <Download className="w-3 h-3" /> Baixar Documentação Completa
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
+      <HistoryPanel
+        showPanel={showPanel}
+        setShowPanel={setShowPanel}
+        titulo={titulo}
+        setTitulo={setTitulo}
+        isSaving={isSaving}
+        savedGroups={savedGroups}
+        docGenerating={docGenerating}
+        docPath={docPath}
+        salvarAula={salvarAula}
+        limparTranscricaoAtual={limparTranscricaoAtual}
+        gerarDocumentacao={gerarDocumentacao}
+      />
 
       {/* BOTÃO SAIR DO MODO FOCO */}
       {modoProjetor && (

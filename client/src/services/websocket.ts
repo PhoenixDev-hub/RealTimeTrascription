@@ -1,3 +1,5 @@
+import { WS_URL } from '../config/backend'
+
 export type TranscriptMessage = {
   type: 'transcript' | 'status' | 'error'
   text: string
@@ -42,12 +44,6 @@ export function parseTranscriptMessage(data: unknown): TranscriptMessage {
     }
   }
 }
-
-const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST ?? 'localhost'
-const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT ?? '5455'
-const WS_URL =
-  import.meta.env.VITE_BACKEND_WS_URL ??
-  `ws://${BACKEND_HOST}:${BACKEND_PORT}/ws`
 
 const INITIAL_RECONNECT_DELAY_MS = 1000
 const MAX_RECONNECT_DELAY_MS = 30000
