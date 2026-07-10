@@ -9,6 +9,40 @@ export type TranscriptMessage = {
 type OuvinteTranscricao = (mensagem: TranscriptMessage) => void
 type OuvinteStatus = (conectado: boolean) => void
 
+export function parseTranscriptMessage(data: unknown): TranscriptMessage {
+  if (typeof data !== 'string' && (typeof data !== 'object' || data === null)) {
+    return { type: 'transcript', text: '', isFinal: false, error: false }
+  }
+
+  try {
+    const parsed = (typeof data === 'string' ? JSON.parse(data) : data) as {
+      type?: unknown
+      text?: unknown
+      is_final?: unknown
+      isFinal?: unknown
+      error?: unknown
+      speaker?: unknown
+    }
+    const type = parsed.type === 'status' || parsed.type === 'error' ? parsed.type : 'transcript'
+
+    return {
+      type,
+      text: typeof parsed.text === 'string' ? parsed.text : '',
+      isFinal: Boolean(parsed.is_final ?? parsed.isFinal),
+      error: Boolean(parsed.error),
+      speaker: typeof parsed.speaker === 'string' ? parsed.speaker : undefined,
+    }
+  } catch (error) {
+    console.error('[WebSocket] Erro ao parsear mensagem:', data, error)
+    return {
+      type: 'error',
+      text: 'Falha ao processar mensagem do servidor',
+      isFinal: true,
+      error: true,
+    }
+  }
+}
+
 const BACKEND_HOST = import.meta.env.VITE_BACKEND_HOST ?? 'localhost'
 const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT ?? '5455'
 const WS_URL =
@@ -156,37 +190,7 @@ class SoqueteTranscricao {
   }
 
   private parseMessage(data: unknown): TranscriptMessage {
-    if (typeof data !== 'string') {
-      return { type: 'transcript', text: '', isFinal: false, error: false }
-    }
-
-    try {
-      const parsed = JSON.parse(data) as {
-        type?: unknown
-        text?: unknown
-        is_final?: unknown
-        isFinal?: unknown
-        error?: unknown
-        speaker?: unknown
-      }
-      const type = parsed.type === 'status' || parsed.type === 'error' ? parsed.type : 'transcript'
-
-      return {
-        type,
-        text: typeof parsed.text === 'string' ? parsed.text : '',
-        isFinal: Boolean(parsed.is_final ?? parsed.isFinal),
-        error: Boolean(parsed.error),
-        speaker: typeof parsed.speaker === 'string' ? parsed.speaker : undefined,
-      }
-    } catch (error) {
-      console.error('[WebSocket] Erro ao parsear mensagem:', data, error)
-      return {
-        type: 'error',
-        text: 'Falha ao processar mensagem do servidor',
-        isFinal: true,
-        error: true,
-      }
-    }
+    return parseTranscriptMessage(data)
   }
 
   private saveTranscriptCache() {

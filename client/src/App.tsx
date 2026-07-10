@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import VLibras from './components/VLibras'
 import simplifyText from './services/simplify'
-import transcriptSocket from './services/websocket'
+import transcriptSocket, { parseTranscriptMessage } from './services/websocket'
 
 const CONTENT_ID = 'conteudo-libras'
 
@@ -171,29 +171,30 @@ function App() {
         } else if (data.type === 'status') {
           setConnectionMode(data.mode || 'assemblyai')
         } else if (data.type === 'transcript') {
+          const message = parseTranscriptMessage(data)
           const rtt = Date.now() - lastSendTimeRef.current
           setLatencyMs(rtt)
           setLatencyAlert(rtt > 500)
 
-          setTexto(data.text)
-          setTraducaoFinal(data.isFinal)
-          setTemErro(data.error)
+          setTexto(message.text)
+          setTraducaoFinal(message.isFinal)
+          setTemErro(message.error)
 
-          if (data.speaker) {
-            setActiveSpeaker(data.speaker)
+          if (message.speaker) {
+            setActiveSpeaker(message.speaker)
           }
 
-          if (data.isFinal && !data.error) {
-            setTextoFinal(data.text)
+          if (message.isFinal && !message.error) {
+            setTextoFinal(message.text)
             setHistoricoTick((tick) => tick + 1)
 
             // Põe a transcrição no cache para permitir salvar
             transcriptSocket.getTranscriptCache().push({
               type: 'transcript',
-              text: data.text,
+              text: message.text,
               isFinal: true,
-              error: data.error,
-              speaker: data.speaker,
+              error: message.error,
+              speaker: message.speaker,
             })
           }
         }
@@ -244,26 +245,27 @@ function App() {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'transcript') {
+            const message = parseTranscriptMessage(data)
             const rtt = Date.now() - lastSendTimeRef.current
             setLatencyMs(rtt)
             setLatencyAlert(rtt > 500)
 
-            setTexto(data.text)
-            setTraducaoFinal(data.isFinal)
-            setTemErro(data.error)
-            if (data.speaker) {
-              setActiveSpeaker(data.speaker)
+            setTexto(message.text)
+            setTraducaoFinal(message.isFinal)
+            setTemErro(message.error)
+            if (message.speaker) {
+              setActiveSpeaker(message.speaker)
             }
-            if (data.isFinal && !data.error) {
-              setTextoFinal(data.text)
+            if (message.isFinal && !message.error) {
+              setTextoFinal(message.text)
               setHistoricoTick((tick) => tick + 1)
 
               transcriptSocket.getTranscriptCache().push({
                 type: 'transcript',
-                text: data.text,
+                text: message.text,
                 isFinal: true,
-                error: data.error,
-                speaker: data.speaker,
+                error: message.error,
+                speaker: message.speaker,
               })
             }
           }
