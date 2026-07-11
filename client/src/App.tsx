@@ -104,7 +104,7 @@ function App() {
     return simplifyText(textoBase)
   }, [textoBase])
 
-  // Buffer de 1 segundo para agrupar palavras em frases curtas e enviar ao player VLibras
+  // Buffer VLibras
   const [, setVlibrasBuffer] = useState('')
   const [textoEnviadoAoVLibras, setTextoEnviadoAoVLibras] = useState('')
   const timerRef = useRef<number | null>(null)
@@ -130,7 +130,7 @@ function App() {
 
     if (!newPart) return
 
-    // Pausa natural (termina com pontuação como ponto final, vírgula, interrogação)
+    // Pausa natural
     const endsWithPause = /[.,\/#!$%\^&\*;:{}=\-_`~()?]/.test(newPart.slice(-1))
 
     if (endsWithPause) {
@@ -208,9 +208,9 @@ function App() {
           </div>
         </div>
 
-        {/* CONTROLES DE ÁUDIO E STATUS */}
+        {/* Controles */}
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          {/* Seletor de Microfone */}
+          {/* Microfone */}
           <div className="flex items-center gap-1.5 rounded-lg border border-[#82E3FF]/20 bg-[#031A5C]/40 px-2.5 py-1 text-xs">
             <Volume2 className="w-3.5 h-3.5 text-[#82E3FF]" />
             <select
@@ -226,7 +226,7 @@ function App() {
             </select>
           </div>
 
-          {/* Botão de captura */}
+          {/* Captura */}
           <button
             onClick={capturing ? pararCaptura : iniciarCaptura}
             className={`flex min-h-[34px] cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
@@ -246,7 +246,7 @@ function App() {
             )}
           </button>
 
-          {/* Medidor de Áudio Visual */}
+          {/* Medidor visual */}
           {capturing && (
             <div className="flex items-center gap-1 rounded-lg border border-[#82E3FF]/10 bg-black/40 px-2 py-2 h-[34px]">
               <span className="text-[10px] text-[#B7C8EF] font-bold">Nível:</span>
@@ -259,7 +259,7 @@ function App() {
             </div>
           )}
 
-          {/* Indicador de Fala / Filtro VAD */}
+          {/* Filtro VAD */}
           <button
             onClick={() => setUseVadGating(!useVadGating)}
             className={`flex min-h-[34px] cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all duration-300 ${
@@ -275,7 +275,7 @@ function App() {
             {useVadGating ? (speaking ? 'Falando' : 'Silêncio') : 'Fluxo Contínuo'}
           </button>
 
-          {/* Indicador de Latência */}
+          {/* Latência */}
           {capturing && (
             <span
               className={`flex min-h-[34px] items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
@@ -289,7 +289,7 @@ function App() {
             </span>
           )}
 
-          {/* Modo de Conexão */}
+          {/* Conexão */}
           <span className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-lg border border-[#82E3FF]/20 bg-[#031A5C]/60 px-3 py-1.5 text-xs font-bold text-[#F2F6FF]">
             {connectionMode === 'assemblyai' ? (
               <>
@@ -322,7 +322,7 @@ function App() {
         </div>
       </header>
 
-      {/* Erros amigáveis de áudio */}
+      {/* Erros de áudio */}
       {audioError && (
         <div className="absolute left-1/2 top-24 z-40 -translate-x-1/2 w-[90vw] max-w-[500px] rounded-lg border border-red-500/40 bg-red-950/90 p-4 shadow-xl backdrop-blur-md">
           <div className="flex gap-2">
@@ -349,7 +349,7 @@ function App() {
         gerarDocumentacao={gerarDocumentacao}
       />
 
-      {/* BOTÃO SAIR DO MODO FOCO */}
+      {/* Sair modo foco */}
       {modoProjetor && (
         <button
           onClick={() => setModoProjetor(false)}
@@ -359,7 +359,7 @@ function App() {
         </button>
       )}
 
-      {/* CORES DINÂMICAS E CAIXA DE LEGENDA */}
+      {/* Cores e legenda */}
       {(() => {
         const isAluno = activeSpeaker.toLowerCase().includes('aluno') || activeSpeaker.toLowerCase().includes('speaker')
         const colorBorder = isAluno ? 'border-[#FFB042]/50' : 'border-[#82E3FF]/40'

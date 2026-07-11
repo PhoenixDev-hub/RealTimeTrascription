@@ -25,18 +25,18 @@ O Backend atua como a espinha dorsal de captura de hardware, filtragem de sinais
 - A biblioteca `sounddevice` se conecta diretamente à interface ALSA/PulseAudio do sistema operacional (hardware-level).
 - O áudio é gravado em blocos crus (*Raw PCM chunks*) usando Sample Rate de `16.000 Hz` (formato ideal exigido por redes neurais acústicas), em apenas `1 canal` (mono) para eficiência de rede.
 - **Detecção Computacional de Fala (WebRTC VAD)**:
-  - O algoritmo passa o sinal de áudio pelo Voice Activity Detection do WebRTC.
-  - Para resistir ao ruído extremo de ambientes escolares (ventiladores, conversas), ele opera no `Mode 3` (Agressividade matemática máxima).
-  - O `Energy Threshold` de RMS (Root Mean Square) é ajustado rigorosamente para barrar frequências de fundo, liberando o processamento apenas quando detecta a força vocal (threshold de 500) do microfone principal.
+ - O algoritmo passa o sinal de áudio pelo Voice Activity Detection do WebRTC.
+ - Para resistir ao ruído extremo de ambientes escolares (ventiladores, conversas), ele opera no `Mode 3` (Agressividade matemática máxima).
+ - O `Energy Threshold` de RMS (Root Mean Square) é ajustado rigorosamente para barrar frequências de fundo, liberando o processamento apenas quando detecta a força vocal (threshold de 500) do microfone principal.
 
 ### 2.3. Modelos de Transcrição (Speech-to-Text Híbrido)
 O sistema conta com tolerância a falhas (Fault Tolerance) de Nível 1.
 1. **Modelo Primário (Cloud Real-time)**: API WebSocket do provedor AssemblyAI.
-   - Rede neural utilizada: **Universal-3 Real-Time Pro (`u3-rt-pro`)**.
-   - Otimização via Engenharia de Prompt: O modelo é pré-instruído dinamicamente a focar no "Português do Brasil, jargões escolares, vocabulário acadêmico", elevando a precisão contextual.
+ - Rede neural utilizada: **Universal-3 Real-Time Pro (`u3-rt-pro`)**.
+ - Otimização via Engenharia de Prompt: O modelo é pré-instruído dinamicamente a focar no "Português do Brasil, jargões escolares, vocabulário acadêmico", elevando a precisão contextual.
 2. **Modelo Fallback (Local Offline)**: `faster-whisper`.
-   - Caso o backend detecte queda de pacotes (via Probe de conectividade `1.1.1.1` porta `53`), o servidor transiciona sem quebrar a aplicação para o processamento offline.
-   - Utiliza o modelo **`base` da OpenAI** comprimido pelo motor CTranslate2, que traduz áudio com alta resiliência via CPU ou GPU.
+ - Caso o backend detecte queda de pacotes (via Probe de conectividade `1.1.1.1` porta `53`), o servidor transiciona sem quebrar a aplicação para o processamento offline.
+ - Utiliza o modelo **`base` da OpenAI** comprimido pelo motor CTranslate2, que traduz áudio com alta resiliência via CPU ou GPU.
 
 ### 2.4. Persistência de Dados (File System)
 - A classe interna `TranscriptManager` orquestra o banco de dados local.
@@ -56,10 +56,10 @@ O Frontend é um processador ativo que reage aos dados e injeta código dinâmic
 
 ### 3.2. A Interface Gráfica de Acessibilidade Visual
 - **Diarização Baseada em Cores**:
-  - O cliente React intercepta o Payload do WebSocket e valida a chave `activeSpeaker`.
-  - Se for um **"Aluno"**, o React altera dinamicamente os Dropshadows, gradientes, bordas radiais e a luz indicadora (dot) para a paleta **Âmbar/Laranja (`#FFB042`)**.
-  - Se for o **"Professor"**, o tema retorna instantaneamente para a cor primária **Ciano/Azul Ciel (`#82E3FF`)**.
-  - Essa mecânica (Feedback Sensorial) garante ao espectador surdo a distinção imediata de quem tem o domínio da fala no ambiente escolar.
+ - O cliente React intercepta o Payload do WebSocket e valida a chave `activeSpeaker`.
+ - Se for um **"Aluno"**, o React altera dinamicamente os Dropshadows, gradientes, bordas radiais e a luz indicadora (dot) para a paleta **Âmbar/Laranja (`#FFB042`)**.
+ - Se for o **"Professor"**, o tema retorna instantaneamente para a cor primária **Ciano/Azul Ciel (`#82E3FF`)**.
+ - Essa mecânica (Feedback Sensorial) garante ao espectador surdo a distinção imediata de quem tem o domínio da fala no ambiente escolar.
 - **Animações Cinematográficas**: A apresentação das palavras lida com blocos de CSS `@keyframes text-reveal`. Cada atualização do `textoExibido` cria uma movimentação condicional no Eixo Y de `12px` removendo filtros de `blur` progressivamente, simulando letreiros em 60fps sem sobrecarga da DOM.
 - **Modo Projetor (Focus Mode)**: O estado da interface (`useState`) remove seletivamente componentes auxiliares da árvore da DOM, gerando uma tela limpa e imersiva adaptada exclusivamente a Datashows escolares, isolando apenas a Legenda e o Avatar 3D.
 
@@ -81,11 +81,11 @@ O Frontend é um processador ativo que reage aos dados e injeta código dinâmic
 O tráfego principal opera na URL `ws://localhost:5455/ws`. O servidor e o cliente trocam strings JSON com a seguinte topologia estrita:
 ```json
 {
-  "type": "transcript",
-  "text": "O exemplo prático da molécula de oxigênio.",
-  "isFinal": true,
-  "error": false,
-  "speaker": "Professor"
+ "type": "transcript",
+ "text": "O exemplo prático da molécula de oxigênio.",
+ "isFinal": true,
+ "error": false,
+ "speaker": "Professor"
 }
 ```
 

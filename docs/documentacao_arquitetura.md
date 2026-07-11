@@ -1,71 +1,71 @@
-# 📖 Documentação Técnica de Arquitetura — DualLibras.AI
+# Documentação Técnica de Arquitetura — DualLibras.AI
 
 Este documento descreve detalhadamente a arquitetura do sistema, o fluxo de dados, as tecnologias utilizadas e o funcionamento interno de cada módulo do **DualLibras.AI**.
 
 
-## 🛠️ 1. Stack Tecnológico
+## 1. Stack Tecnológico
 
 A tabela abaixo descreve as tecnologias utilizadas em cada camada do sistema:
 
 | Camada | Tecnologia | Papel no Sistema |
 | - | - | - |
 | **Frontend** | **React 19 + Vite** | SPA (Single Page Application) responsiva e de alta performance. |
-|  | **TypeScript** | Tipagem estática para maior segurança e qualidade do código. |
-|  | **Tailwind CSS v4** | Estilização moderna e responsiva (estilo escuro glassmorphism). |
-|  | **VLibras Gov Widget** | Widget oficial brasileiro com avatar 3D para tradução de Libras. |
+| | **TypeScript** | Tipagem estática para maior segurança e qualidade do código. |
+| | **Tailwind CSS v4** | Estilização moderna e responsiva (estilo escuro glassmorphism). |
+| | **VLibras Gov Widget** | Widget oficial brasileiro com avatar 3D para tradução de Libras. |
 | **Backend** | **FastAPI (Python)** | Framework assíncrono para a API REST e servidor WebSocket. |
-|  | **Uvicorn** | Servidor ASGI para rodar a aplicação FastAPI com alta performance. |
-|  | **SoundDevice + NumPy** | Captura do microfone local e processamento matemático de arrays de áudio. |
+| | **Uvicorn** | Servidor ASGI para rodar a aplicação FastAPI com alta performance. |
+| | **SoundDevice + NumPy** | Captura do microfone local e processamento matemático de arrays de áudio. |
 | **Motores de IA** | **AssemblyAI v3 API** | Reconhecimento de fala em tempo real de altíssima acurácia (Nuvem). |
-|  | **Faster-Whisper** | Transcritor local leve com otimização C2Translate (Fallback local). |
-|  | **WebRTC VAD** | Detetor de Atividade de Voz do Google WebRTC compilado para Python. |
+| | **Faster-Whisper** | Transcritor local leve com otimização C2Translate (Fallback local). |
+| | **WebRTC VAD** | Detetor de Atividade de Voz do Google WebRTC compilado para Python. |
 | **Documentos** | **ReportLab** | Biblioteca Python para geração programática de PDFs estilizados. |
 | **Container** | **Docker & Compose** | Padronização do ambiente e facilitação do deploy em produção. |
-|  | **Nginx** | Reverse Proxy para roteamento do WebSocket `/ws` e arquivos estáticos. |
+| | **Nginx** | Reverse Proxy para roteamento do WebSocket `/ws` e arquivos estáticos. |
 
 
 
-## 🌐 2. Visão Geral da Arquitetura
+## 2. Visão Geral da Arquitetura
 
 O sistema é baseado em uma **arquitetura híbrida cliente-servidor (Edge-to-Cloud)**. Ele funciona de forma integrada através de fluxos bidirecionais contínuos:
 
 ```
-                  ┌───────────────────────┐  
-                  │   Microfone (Professor)│  
-                  └──────────┬────────────┘  
-                             │ (Áudio PCM 16kHz)  
-                             ▼  
-  ┌─────────────────────────────────────────────────────────┐  
-  │                   BACKEND (FastAPI)                     │  
-  │                                                         │  
-  │   1. Captura de Áudio (SoundDevice)                      │  
-  │   2. Filtro VAD (WebRTC / RMS Energy)                   │  
-  │                                                         │  
-  │            Internet?                                    │  
-  │          ┌──── SIM ───── Na Nuvem ─────┐                │  
-  │          ▼                             ▼                │  
-  │   ┌──────────────┐              ┌─────────────┐         │  
-  │   │  AssemblyAI  │              │   Whisper   │         │  
-  │   │  (Streaming) │              │   (Local)   │         │  
-  │   └──────┬───────┘              └──────┬──────┘         │  
-  │          │                             │                │  
-  │          └──────────────┬──────────────┘                │  
-  │                         ▼                               │  
-  │                  Texto Transcrito                       │  
-  └─────────────────────────┬───────────────────────────────┘  
-                            │ (WebSockets)  
-                            ▼  
-  ┌─────────────────────────────────────────────────────────┐  
-  │                   FRONTEND (React)                      │  
-  │                                                         │  
-  │   1. Exibição da Legenda (App.tsx)                      │  
-  │   2. Simplificação Textual (simplify.ts)                │  
-  │   3. Animação do Avatar 3D (VLibras)                    │  
-  └─────────────────────────────────────────────────────────┘
+ 
+ Microfone (Professor) 
+ 
+ (Áudio PCM 16kHz) 
+ 
+ 
+ BACKEND (FastAPI) 
+ 
+ 1. Captura de Áudio (SoundDevice) 
+ 2. Filtro VAD (WebRTC / RMS Energy) 
+ 
+ Internet? 
+ SIM Na Nuvem 
+ 
+ 
+ AssemblyAI Whisper 
+ (Streaming) (Local) 
+ 
+ 
+ 
+ 
+ Texto Transcrito 
+ 
+ (WebSockets) 
+ 
+ 
+ FRONTEND (React) 
+ 
+ 1. Exibição da Legenda (App.tsx) 
+ 2. Simplificação Textual (simplify.ts) 
+ 3. Animação do Avatar 3D (VLibras) 
+ 
 ```
 
 
-## 🔄 3. Funcionamento Interno Passo a Passo
+## 3. Funcionamento Interno Passo a Passo
 
 ### Passo 1: Captura e Tratamento de Áudio
 
@@ -95,9 +95,9 @@ Se a internet estiver ativa, os blocos de áudio validados pelo VAD são transmi
 
 - **Retorno da transcrição**: A API devolve dois tipos de respostas:
 
-  1. *Parciais*: Frases que mudam rapidamente à medida que o locutor fala.
+ 1. *Parciais*: Frases que mudam rapidamente à medida que o locutor fala.
 
-  2. *Finais*: A frase completa, pontuada e corrigida pela inteligência artificial.
+ 2. *Finais*: A frase completa, pontuada e corrigida pela inteligência artificial.
 
 #### Pipeline B: Modo Offline / Local (faster-whisper)
 
@@ -114,11 +114,11 @@ Se o validador de conexão (`is\_internet\_available`) detectar que a internet c
 O backend mantém um conjunto ativo de conexões WebSocket com os clientes (`clientes: set\[WebSocket\]`). Cada transcrição gerada pelo pipeline ativo é formatada em um JSON contendo:
 
 ```
-\{  
-  "type": "transcript",  
-  "text": "Frase transcrita aqui",  
-  "is\_final": true,  
-  "speaker": "Palestrante A"  
+\{ 
+ "type": "transcript", 
+ "text": "Frase transcrita aqui", 
+ "is\_final": true, 
+ "speaker": "Palestrante A" 
 \}
 ```
 
@@ -151,23 +151,23 @@ Quando a aula se encerra ou quando o usuário clica em "Salvar Aula", o frontend
 - A biblioteca **ReportLab** é invocada. Ela registra fontes TrueType locais compatíveis com caracteres especiais (como DejaVuSans ou LiberationSans), define folhas de estilo tipográficas e gera um documento PDF profissional com margens, cabeçalho dinâmico e rodapé de metadados.
 
 
-## 🔊 4. Parâmetros Críticos para Ambientes Barulhentos
+## 4. Parâmetros Críticos para Ambientes Barulhentos
 
 Para o correto funcionamento em **salas de aula reais com ruído de fundo**, estes são os parâmetros mais importantes configurados no arquivo `.env` do backend:
 
 1. **`VAD\_MODE=3` (Máxima Agressividade)**
 
-   - Configura o WebRTC VAD para ser o mais restritivo possível. O algoritmo de detecção de probabilidade de voz de banda estreita ignorará ruídos como batidas de porta, sussurros distantes e barulho de tráfego, capturando apenas a fala limpa próxima ao microfone.
+ - Configura o WebRTC VAD para ser o mais restritivo possível. O algoritmo de detecção de probabilidade de voz de banda estreita ignorará ruídos como batidas de porta, sussurros distantes e barulho de tráfego, capturando apenas a fala limpa próxima ao microfone.
 
 2. **`VAD\_ENERGY\_THRESHOLD=350` ou `400`**
 
-   - Aumenta a barreira de volume mínima no modo de fallback. Evita que o Whisper offline tente transcrever barulhos estáticos constantes (como zumbidos elétricos ou som de ventiladores próximos).
+ - Aumenta a barreira de volume mínima no modo de fallback. Evita que o Whisper offline tente transcrever barulhos estáticos constantes (como zumbidos elétricos ou som de ventiladores próximos).
 
 3. **`VAD\_HOLD\_SILENCE\_MS=300`**
 
-   - Aumenta ligeiramente a janela de retenção. Em ambientes barulhentos, o professor pode falar de forma mais pausada devido à acústica da sala. Manter o canal aberto por 300ms garante que as palavras não fiquem fragmentadas em arquivos de áudio separados.
+ - Aumenta ligeiramente a janela de retenção. Em ambientes barulhentos, o professor pode falar de forma mais pausada devido à acústica da sala. Manter o canal aberto por 300ms garante que as palavras não fiquem fragmentadas em arquivos de áudio separados.
 
 4. **`LOCAL\_FALLBACK\_MODEL=base` ou `small`**
 
-   - Em salas barulhentas, o modelo `tiny` do Whisper local pode cometer muitos erros fonéticos pela falta de clareza do áudio. O modelo `base` ou `small` oferece maior resistência a ruídos devido à sua quantidade muito superior de parâmetros neurais.
+ - Em salas barulhentas, o modelo `tiny` do Whisper local pode cometer muitos erros fonéticos pela falta de clareza do áudio. O modelo `base` ou `small` oferece maior resistência a ruídos devido à sua quantidade muito superior de parâmetros neurais.
 

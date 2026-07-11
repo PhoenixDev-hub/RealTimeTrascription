@@ -216,7 +216,7 @@ export function useAudioCapture({ onTranscript }: UseAudioCaptureOptions) {
       const ctx = new AudioContext({ sampleRate: 16000 })
       audioContextRef.current = ctx
 
-      // @ts-ignore simple-rnnoise-wasm does not ship complete browser types.
+      // Faltam tipos completos no simple-rnnoise-wasm
       const { RNNoiseNode, rnnoise_loadAssets } = await import('simple-rnnoise-wasm')
       const assets = await rnnoise_loadAssets({
         scriptSrc: '/rnnoise.worklet.js',

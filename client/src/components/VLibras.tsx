@@ -152,7 +152,7 @@ export default function VLibras({ text, onStatusChange }: VLibrasProps) {
       window.VLibrasPlayer?.setSpeed?.(DEFAULT_SPEED)
       window.plugin?.setSpeed?.(DEFAULT_SPEED)
     } catch {
-      // Ignore errors when setting speed
+      // Ignora erros ao definir velocidade
     }
     return true
   }, [])

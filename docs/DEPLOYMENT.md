@@ -1,4 +1,4 @@
-# 🚀 Guia de Deployment - DualLibras.AI
+# Guia de Deployment - DualLibras.AI
 
 ## Pré-requisitos
 
@@ -44,45 +44,45 @@ docker-compose logs -f
 ### Recomendações
 
 1. **Usar variáveis de ambiente seguras**
-   ```bash
-   # Não commitar .env em produção
-   docker-compose --env-file /secure/.env up -d
-   ```
+ ```bash
+ # Não commitar .env em produção
+ docker-compose --env-file /secure/.env up -d
+ ```
 
 2. **Configurar reverse proxy (Nginx/Apache)**
-   ```nginx
-   location /ws {
-     proxy_pass http://backend:5455/ws;
-     proxy_http_version 1.1;
-     proxy_set_header Upgrade $http_upgrade;
-     proxy_set_header Connection "upgrade";
-   }
-   ```
+ ```nginx
+ location /ws {
+ proxy_pass http://backend:5455/ws;
+ proxy_http_version 1.1;
+ proxy_set_header Upgrade $http_upgrade;
+ proxy_set_header Connection "upgrade";
+ }
+ ```
 
 3. **Volumes persistentes**
-   ```yaml
-   volumes:
-     - ./transcripts:/app/transcripts
-     - ./logs:/app/logs
-   ```
+ ```yaml
+ volumes:
+ - ./transcripts:/app/transcripts
+ - ./logs:/app/logs
+ ```
 
 4. **Backup de transcrições**
-   ```bash
-   docker cp duallibras-backend:/app/transcripts ./backup/
-   ```
+ ```bash
+ docker cp duallibras-backend:/app/transcripts ./backup/
+ ```
 
 ## Scaling & Performance
 
 ### Para múltiplas instituições
 ```yaml
 services:
-  backend1:
-    build: ./server
-    ports: ["5455:5455"]
-  backend2:
-    build: ./server
-    ports: ["5456:5455"]
-  # Load balancer configura port 5000 → 5455/5456
+ backend1:
+ build: ./server
+ ports: ["5455:5455"]
+ backend2:
+ build: ./server
+ ports: ["5456:5455"]
+ # Load balancer configura port 5000 → 5455/5456
 ```
 
 ### Otimizações
@@ -119,13 +119,13 @@ lsof -i :5455
 
 # Mudar porta no docker-compose.yml
 ports:
-  - "5456:5455"  # Host:Container
+ - "5456:5455" # Host:Container
 ```
 
 ### Problemas de memória
 ```bash
 # Limitar Whisper model
-LOCAL_FALLBACK_MODEL=tiny  # em vez de base/small
+LOCAL_FALLBACK_MODEL=tiny # em vez de base/small
 
 # Reduzir audio queue
 AUDIO_QUEUE_MAX_SIZE=4

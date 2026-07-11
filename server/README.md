@@ -4,14 +4,14 @@ Aplicação de transcrição de áudio em tempo real em português, utilizando A
 
 ## Funcionalidades
 
--  Captura de áudio em tempo real via PipeWire
--  Transcrição em português com detecção de fala
--  Tradução automática para Libras com avatar 3D
--  Interface via terminal interativo
--  Processamento de áudio com controle de ruído
--  Comunicação em tempo real via WebSocket
--  **Salvamento automático de transcrições em PDF, TXT e JSON**
--  **API REST para gerenciamento de transcrições**
+- Captura de áudio em tempo real via PipeWire
+- Transcrição em português com detecção de fala
+- Tradução automática para Libras com avatar 3D
+- Interface via terminal interativo
+- Processamento de áudio com controle de ruído
+- Comunicação em tempo real via WebSocket
+- **Salvamento automático de transcrições em PDF, TXT e JSON**
+- **API REST para gerenciamento de transcrições**
 
 ## Requisitos
 
@@ -79,31 +79,31 @@ POST /save-transcript
 Content-Type: application/json
 
 {
-  "text": "Texto da transcrição aqui...",
-  "title": "Minha Transcrição",
-  "formats": ["pdf", "txt", "json"],
-  "metadata": {
-    "evento": "Festival 2026",
-    "palestrante": "Nome do palestrante"
-  }
+ "text": "Texto da transcrição aqui...",
+ "title": "Minha Transcrição",
+ "formats": ["pdf", "txt", "json"],
+ "metadata": {
+ "evento": "Festival 2026",
+ "palestrante": "Nome do palestrante"
+ }
 }
 ```
 
 **Resposta:**
 ```json
 {
-  "success": true,
-  "message": "Transcrição salva com sucesso em 3 formato(s)",
-  "files": {
-    "pdf": "transcripts/pdfs/transcricao_20260603_120000.pdf",
-    "txt": "transcripts/texts/transcricao_20260603_120000.txt",
-    "json": "transcripts/metadata/transcricao_20260603_120000_metadata.json"
-  },
-  "metadata": {
-    "title": "Minha Transcrição",
-    "text_length": 250,
-    "formats_saved": ["pdf", "txt", "json"]
-  }
+ "success": true,
+ "message": "Transcrição salva com sucesso em 3 formato(s)",
+ "files": {
+ "pdf": "transcripts/pdfs/transcricao_20260603_120000.pdf",
+ "txt": "transcripts/texts/transcricao_20260603_120000.txt",
+ "json": "transcripts/metadata/transcricao_20260603_120000_metadata.json"
+ },
+ "metadata": {
+ "title": "Minha Transcrição",
+ "text_length": 250,
+ "formats_saved": ["pdf", "txt", "json"]
+ }
 }
 ```
 
@@ -115,10 +115,10 @@ GET /transcripts
 **Resposta:**
 ```json
 {
-  "total": 5,
-  "pdfs": ["transcricao_20260603_120000.pdf", "..."],
-  "texts": ["transcricao_20260603_120000.txt", "..."],
-  "metadata": ["transcricao_20260603_120000_metadata.json", "..."]
+ "total": 5,
+ "pdfs": ["transcricao_20260603_120000.pdf", "..."],
+ "texts": ["transcricao_20260603_120000.txt", "..."],
+ "metadata": ["transcricao_20260603_120000_metadata.json", "..."]
 }
 ```
 
@@ -137,19 +137,19 @@ GET /upload-status
 **Resposta:**
 ```json
 {
-  "paths": {
-    "base": "./output",
-    "pdfs": "./output/transcripts/pdfs",
-    "texts": "./output/transcripts/texts",
-    "metadata": "./output/transcripts/metadata"
-  },
-  "counts": {
-    "pdfs": 5,
-    "texts": 5,
-    "metadata": 5
-  },
-  "total_size_mb": 1.25,
-  "status": "online"
+ "paths": {
+ "base": "./output",
+ "pdfs": "./output/transcripts/pdfs",
+ "texts": "./output/transcripts/texts",
+ "metadata": "./output/transcripts/metadata"
+ },
+ "counts": {
+ "pdfs": 5,
+ "texts": 5,
+ "metadata": 5
+ },
+ "total_size_mb": 1.25,
+ "status": "online"
 }
 ```
 
@@ -159,13 +159,13 @@ A aplicação organiza automaticamente as transcrições em uma estrutura clara:
 
 ```
 output/
-└── transcripts/
-    ├── pdfs/              # Documentos PDF gerados
-    │   └── transcricao_20260603_120000.pdf
-    ├── texts/             # Arquivos de texto plano
-    │   └── transcricao_20260603_120000.txt
-    └── metadata/          # Informações em JSON
-        └── transcricao_20260603_120000_metadata.json
+ transcripts/
+ pdfs/ # Documentos PDF gerados
+ transcricao_20260603_120000.pdf
+ texts/ # Arquivos de texto plano
+ transcricao_20260603_120000.txt
+ metadata/ # Informações em JSON
+ transcricao_20260603_120000_metadata.json
 ```
 
 ## Como Funciona
@@ -179,25 +179,25 @@ output/
 ## Estrutura do Projeto
 
 ```
-├── server/
-│   ├── app/
-│   │   ├── api.py                     # API REST e WebSocket
-│   │   ├── config.py                  # Configurações
-│   │   ├── transcription.py           # Lógica de transcrição
-│   │   └── transcript_manager.py      # Gerenciador de PDFs e salvamento
-│   ├── main.py
-│   ├── requirements.txt
-│   └── .env
-├── client/
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── components/
-│   │   │   └── VLibras.tsx
-│   │   └── services/
-│   │       └── websocket.ts
-│   └── package.json
-└── output/
-    └── transcripts/                   # Transcrições salvas (criado automaticamente)
+ server/
+ app/
+ api.py # API REST e WebSocket
+ config.py # Configurações
+ transcription.py # Lógica de transcrição
+ transcript_manager.py # Gerenciador de PDFs e salvamento
+ main.py
+ requirements.txt
+ .env
+ client/
+ src/
+ App.tsx
+ components/
+ VLibras.tsx
+ services/
+ websocket.ts
+ package.json
+ output/
+ transcripts/ # Transcrições salvas (criado automaticamente)
 ```
 
 ## APIs Utilizadas

@@ -6,10 +6,10 @@ A aplicação organiza automaticamente as transcrições em:
 
 ```
 output/
-└── transcripts/
-    ├── pdfs/              ← Documentos PDF
-    ├── texts/             ← Arquivos de texto plano
-    └── metadata/          ← Informações em JSON
+ transcripts/
+ pdfs/ ← Documentos PDF
+ texts/ ← Arquivos de texto plano
+ metadata/ ← Informações em JSON
 ```
 
 ## Como Usar
@@ -43,16 +43,16 @@ O servidor estará disponível em: `http://localhost:5455`
 
 ```bash
 curl -X POST http://localhost:5455/save-transcript \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Olá, este é meu texto transcrito!",
-    "title": "Minha Transcrição",
-    "formats": ["pdf", "txt", "json"],
-    "metadata": {
-      "evento": "Festival 2026",
-      "palestrante": "João Silva"
-    }
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "text": "Olá, este é meu texto transcrito!",
+ "title": "Minha Transcrição",
+ "formats": ["pdf", "txt", "json"],
+ "metadata": {
+ "evento": "Festival 2026",
+ "palestrante": "João Silva"
+ }
+ }'
 ```
 
 #### Usando Python:
@@ -61,16 +61,16 @@ curl -X POST http://localhost:5455/save-transcript \
 import httpx
 
 response = httpx.post(
-    "http://localhost:5455/save-transcript",
-    json={
-        "text": "Olá, este é meu texto transcrito!",
-        "title": "Minha Transcrição",
-        "formats": ["pdf", "txt", "json"],
-        "metadata": {
-            "evento": "Festival 2026",
-            "palestrante": "João Silva"
-        }
-    }
+ "http://localhost:5455/save-transcript",
+ json={
+ "text": "Olá, este é meu texto transcrito!",
+ "title": "Minha Transcrição",
+ "formats": ["pdf", "txt", "json"],
+ "metadata": {
+ "evento": "Festival 2026",
+ "palestrante": "João Silva"
+ }
+ }
 )
 
 print(response.json())
@@ -80,17 +80,17 @@ print(response.json())
 
 ```typescript
 const response = await fetch("http://localhost:5455/save-transcript", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    text: "Olá, este é meu texto transcrito!",
-    title: "Minha Transcrição",
-    formats: ["pdf", "txt", "json"],
-    metadata: {
-      evento: "Festival 2026",
-      palestrante: "João Silva"
-    }
-  })
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({
+ text: "Olá, este é meu texto transcrito!",
+ title: "Minha Transcrição",
+ formats: ["pdf", "txt", "json"],
+ metadata: {
+ evento: "Festival 2026",
+ palestrante: "João Silva"
+ }
+ })
 });
 
 const data = await response.json();
@@ -99,7 +99,7 @@ console.log(data);
 
 ### 4. Endpoints Disponíveis
 
-#### ✅ Salvar Transcrição
+#### Salvar Transcrição
 ```
 POST /save-transcript
 ```
@@ -114,22 +114,22 @@ Salva em múltiplos formatos (PDF, TXT, JSON)
 **Resposta:**
 ```json
 {
-  "success": true,
-  "message": "Transcrição salva com sucesso em 3 formato(s)",
-  "files": {
-    "pdf": "transcripts/pdfs/transcricao_20260603_120000.pdf",
-    "txt": "transcripts/texts/transcricao_20260603_120000.txt",
-    "json": "transcripts/metadata/transcricao_20260603_120000_metadata.json"
-  },
-  "metadata": {
-    "title": "Minha Transcrição",
-    "text_length": 250,
-    "formats_saved": ["pdf", "txt", "json"]
-  }
+ "success": true,
+ "message": "Transcrição salva com sucesso em 3 formato(s)",
+ "files": {
+ "pdf": "transcripts/pdfs/transcricao_20260603_120000.pdf",
+ "txt": "transcripts/texts/transcricao_20260603_120000.txt",
+ "json": "transcripts/metadata/transcricao_20260603_120000_metadata.json"
+ },
+ "metadata": {
+ "title": "Minha Transcrição",
+ "text_length": 250,
+ "formats_saved": ["pdf", "txt", "json"]
+ }
 }
 ```
 
-#### 📋 Listar Transcrições
+#### Listar Transcrições
 ```
 GET /transcripts
 ```
@@ -138,14 +138,14 @@ Lista todas as transcrições salvas
 **Resposta:**
 ```json
 {
-  "total": 5,
-  "pdfs": ["transcricao_20260603_120000.pdf", "..."],
-  "texts": ["transcricao_20260603_120000.txt", "..."],
-  "metadata": ["transcricao_20260603_120000_metadata.json", "..."]
+ "total": 5,
+ "pdfs": ["transcricao_20260603_120000.pdf", "..."],
+ "texts": ["transcricao_20260603_120000.txt", "..."],
+ "metadata": ["transcricao_20260603_120000_metadata.json", "..."]
 }
 ```
 
-#### 📥 Baixar Arquivo
+#### Baixar Arquivo
 ```
 GET /transcripts/download/{filename}
 ```
@@ -157,7 +157,7 @@ GET /transcripts/download/transcricao_20260603_120000.pdf
 GET /transcripts/download/transcricao_20260603_120000.txt
 ```
 
-#### 📊 Status de Armazenamento
+#### Status de Armazenamento
 ```
 GET /upload-status
 ```
@@ -165,23 +165,23 @@ GET /upload-status
 **Resposta:**
 ```json
 {
-  "paths": {
-    "base": "./output",
-    "pdfs": "./output/transcripts/pdfs",
-    "texts": "./output/transcripts/texts",
-    "metadata": "./output/transcripts/metadata"
-  },
-  "counts": {
-    "pdfs": 5,
-    "texts": 5,
-    "metadata": 5
-  },
-  "total_size_mb": 1.25,
-  "status": "online"
+ "paths": {
+ "base": "./output",
+ "pdfs": "./output/transcripts/pdfs",
+ "texts": "./output/transcripts/texts",
+ "metadata": "./output/transcripts/metadata"
+ },
+ "counts": {
+ "pdfs": 5,
+ "texts": 5,
+ "metadata": 5
+ },
+ "total_size_mb": 1.25,
+ "status": "online"
 }
 ```
 
-#### ❤️ Health Check
+#### Health Check
 ```
 GET /health
 ```
@@ -192,50 +192,50 @@ GET /health
 
 ```bash
 curl -X POST http://localhost:5455/save-transcript \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Bem-vindo ao Festival 2026. Hoje vamos falar sobre inovação em tecnologia assistiva. Lorem ipsum dolor sit amet...",
-    "title": "Apresentação Festival 2026 - Tecnologia Assistiva",
-    "formats": ["pdf", "txt", "json"],
-    "metadata": {
-      "evento": "Festival 2026",
-      "palestrante": "Dra. Maria Silva",
-      "data": "2026-06-03",
-      "duração": "45 minutos",
-      "tópico": "Tecnologia Assistiva"
-    }
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "text": "Bem-vindo ao Festival 2026. Hoje vamos falar sobre inovação em tecnologia assistiva. Lorem ipsum dolor sit amet...",
+ "title": "Apresentação Festival 2026 - Tecnologia Assistiva",
+ "formats": ["pdf", "txt", "json"],
+ "metadata": {
+ "evento": "Festival 2026",
+ "palestrante": "Dra. Maria Silva",
+ "data": "2026-06-03",
+ "duração": "45 minutos",
+ "tópico": "Tecnologia Assistiva"
+ }
+ }'
 ```
 
 ### Exemplo 2: Apenas salvar em PDF
 
 ```bash
 curl -X POST http://localhost:5455/save-transcript \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Minha transcrição aqui...",
-    "title": "Documento Importante",
-    "formats": ["pdf"]
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "text": "Minha transcrição aqui...",
+ "title": "Documento Importante",
+ "formats": ["pdf"]
+ }'
 ```
 
 ### Exemplo 3: Com dados de identificação
 
 ```bash
 curl -X POST http://localhost:5455/save-transcript \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Conteúdo da transcrição...",
-    "title": "Reunião com Stakeholders",
-    "formats": ["pdf", "txt", "json"],
-    "metadata": {
-      "empresa": "Tech Festival",
-      "departamento": "Inovação",
-      "responsável": "João Pedro",
-      "confidencial": true,
-      "palavras_chave": ["inovação", "tecnologia", "acessibilidade"]
-    }
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "text": "Conteúdo da transcrição...",
+ "title": "Reunião com Stakeholders",
+ "formats": ["pdf", "txt", "json"],
+ "metadata": {
+ "empresa": "Tech Festival",
+ "departamento": "Inovação",
+ "responsável": "João Pedro",
+ "confidencial": true,
+ "palavras_chave": ["inovação", "tecnologia", "acessibilidade"]
+ }
+ }'
 ```
 
 ## Testes
@@ -308,17 +308,17 @@ pip install -r server/requirements.txt
 - Exemplo:
 ```json
 {
-  "title": "Minha Transcrição",
-  "text": "Conteúdo aqui...",
-  "timestamp": "2026-06-03T13:20:47.123456",
-  "filename_base": "transcricao_20260603_132047",
-  "formats": ["pdf", "txt", "json"],
-  "evento": "Festival 2026",
-  "palestrante": "Nome"
+ "title": "Minha Transcrição",
+ "text": "Conteúdo aqui...",
+ "timestamp": "2026-06-03T13:20:47.123456",
+ "filename_base": "transcricao_20260603_132047",
+ "formats": ["pdf", "txt", "json"],
+ "evento": "Festival 2026",
+ "palestrante": "Nome"
 }
 ```
 
-## 🎯 Próximos Passos
+## Próximos Passos
 
 1. **Integrar com frontend**: Chamar `/save-transcript` ao finalizar uma transcrição
 2. **Dashboard**: Criar página para listar e baixar transcrições
@@ -326,7 +326,7 @@ pip install -r server/requirements.txt
 4. **Exportação**: Adicionar suporte para mais formatos (DOCX, RTF, etc.)
 5. **Backup**: Automatizar backup das transcrições salvas
 
-## 📞 Suporte
+## Suporte
 
 Para problemas ou dúvidas, consulte:
 - [README.md](../README.md) - Documentação completa

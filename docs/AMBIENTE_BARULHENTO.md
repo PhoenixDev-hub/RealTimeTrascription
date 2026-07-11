@@ -1,4 +1,4 @@
-# 🔊 Otimizações para Ambiente Barulhento
+# Otimizações para Ambiente Barulhento
 
 ## O Desafio
 
@@ -19,19 +19,19 @@ Salas de aula geralmente têm:
 ```env
 # MUITO BARULHENTO (sala com vários alunos falando)
 USE_WEBRTC_VAD=1
-VAD_MODE=3                  # Máxima agressividade
-VAD_ENERGY_THRESHOLD=500    # Alto threshold
-VAD_HOLD_SILENCE_MS=300     # Manter fala por mais tempo
+VAD_MODE=3 # Máxima agressividade
+VAD_ENERGY_THRESHOLD=500 # Alto threshold
+VAD_HOLD_SILENCE_MS=300 # Manter fala por mais tempo
 
 # BARULHENTO (sala normal com ventilador)
 USE_WEBRTC_VAD=1
-VAD_MODE=2                  # Normal (recomendado)
+VAD_MODE=2 # Normal (recomendado)
 VAD_ENERGY_THRESHOLD=350
 VAD_HOLD_SILENCE_MS=240
 
 # SILENCIOSO (sala isolada)
 USE_WEBRTC_VAD=1
-VAD_MODE=1                  # Menos agressivo
+VAD_MODE=1 # Menos agressivo
 VAD_ENERGY_THRESHOLD=250
 VAD_HOLD_SILENCE_MS=200
 ```
@@ -56,19 +56,19 @@ LOCAL_FALLBACK_MODEL=tiny
 **Como melhorar**:
 
 1. **Usar bom microfone**
-   - Headset com cancellation de ruído
-   - Microfone USB de boa qualidade
-   - Evitar microfones integrados de notebook
+ - Headset com cancellation de ruído
+ - Microfone USB de boa qualidade
+ - Evitar microfones integrados de notebook
 
 2. **Posicionamento**
-   - Microfone próximo da boca (10-15cm)
-   - Afastado do ventilador/AC
-   - Evitar eco (não na esquina/parede)
+ - Microfone próximo da boca (10-15cm)
+ - Afastado do ventilador/AC
+ - Evitar eco (não na esquina/parede)
 
 3. **Configuração do sistema**
-   - Aumentar volume do microfone (não ao máximo)
-   - Usar driver atualizado
-   - Testar com: `DEBUG_LATENCY=1`
+ - Aumentar volume do microfone (não ao máximo)
+ - Usar driver atualizado
+ - Testar com: `DEBUG_LATENCY=1`
 
 ## Testes Recomendados
 
@@ -93,7 +93,7 @@ from faster_whisper import WhisperModel
 model = WhisperModel('tiny')
 segments, _ = model.transcribe('teste.wav', language='pt')
 for segment in segments:
-    print(segment.text)
+ print(segment.text)
 "
 ```
 
@@ -107,21 +107,21 @@ DEBUG_LATENCY=1 LOG_LEVEL=DEBUG python main.py
 
 ## Troubleshooting
 
-### ❌ VAD detecta tudo como fala
+### VAD detecta tudo como fala
 ```env
 # Aumentar aggressividade
 VAD_MODE=3
 VAD_ENERGY_THRESHOLD=400
 ```
 
-### ❌ VAD não detecta fala do professor
+### VAD não detecta fala do professor
 ```env
 # Diminuir aggressividade
 VAD_MODE=1
 VAD_ENERGY_THRESHOLD=200
 ```
 
-### ❌ Muitos erros de transcrição
+### Muitos erros de transcrição
 ```env
 # Usar modelo mais preciso
 LOCAL_FALLBACK_MODEL=base
@@ -130,7 +130,7 @@ LOCAL_FALLBACK_MODEL=base
 # Adicionar filtro de frequência
 ```
 
-### ❌ Latência alta
+### Latência alta
 ```env
 # Usar modelo mais rápido
 LOCAL_FALLBACK_MODEL=tiny
@@ -159,4 +159,4 @@ WHISPER_DEVICE=cuda
 
 ---
 
-**💡 Dica**: Teste em seu próprio ambiente primeiro! Cada sala tem características únicas.
+** Dica**: Teste em seu próprio ambiente primeiro! Cada sala tem características únicas.

@@ -80,7 +80,7 @@ class DocumentationGenerator:
             story = []
 
             story.append(Spacer(1, 0.2 * inch))
-            story.append(Paragraph("🎉 FESTIVAL 2026", header_style))
+            story.append(Paragraph("FESTIVAL 2026", header_style))
             story.append(
                 Paragraph(
                     "Sistema de Transcrição em Tempo Real com Libras", subheader_style
@@ -120,12 +120,12 @@ class DocumentationGenerator:
 
             story.append(Paragraph("Funcionalidades Principais", section_title_style))
             features = [
-                "✓ <b>Transcrição em Tempo Real:</b> Captura e transcreve áudio em português com latência mínima",
-                "✓ <b>Tradução para Libras:</b> Conversão automática de texto para Libras com avatar 3D",
-                "✓ <b>Salvamento Automático:</b> Transcrições salvas em PDF, TXT e JSON para fácil acesso",
-                "✓ <b>API REST integrada:</b> Endpoints para gerenciar e recuperar transcrições",
-                "✓ <b>Suporte a Múltiplos Formatos:</b> Transcrições em texto plano, PDF e dados estruturados",
-                "✓ <b>Interface Web intuitiva:</b> Dashboard para gerenciar documentos e transcrições",
+                "- <b>Transcrição em Tempo Real:</b> Captura e transcreve áudio em português com latência mínima",
+                "- <b>Tradução para Libras:</b> Conversão automática de texto para Libras com avatar 3D",
+                "- <b>Salvamento Automático:</b> Transcrições salvas em PDF, TXT e JSON para fácil acesso",
+                "- <b>API REST integrada:</b> Endpoints para gerenciar e recuperar transcrições",
+                "- <b>Suporte a Múltiplos Formatos:</b> Transcrições em texto plano, PDF e dados estruturados",
+                "- <b>Interface Web intuitiva:</b> Dashboard para gerenciar documentos e transcrições",
             ]
             for feature in features:
                 story.append(Paragraph(feature, body_style))

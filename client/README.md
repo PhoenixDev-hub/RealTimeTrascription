@@ -33,11 +33,11 @@ Acesse em: [http://localhost:5173](http://localhost:5173)
 
 ```
 src/
-├── App.tsx               # Componente principal
-├── components/
-│   └── VLibras.tsx       # Integração com o widget VLibras
-└── services/
-    └── websocket.ts      # Comunicação WebSocket com o backend
+ App.tsx # Componente principal
+ components/
+ VLibras.tsx # Integração com o widget VLibras
+ services/
+ websocket.ts # Comunicação WebSocket com o backend
 ```
 
 ---
@@ -59,23 +59,23 @@ Para habilitar regras com verificação de tipos em produção, atualize o `esli
 
 ```js
 export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      tseslint.configs.recommendedTypeChecked,
-      // ou mais estrito:
-      tseslint.configs.strictTypeChecked,
-      // opcional — regras de estilo:
-      tseslint.configs.stylisticTypeChecked,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
+ globalIgnores(['dist']),
+ {
+ files: ['**/*.{ts,tsx}'],
+ extends: [
+ tseslint.configs.recommendedTypeChecked,
+ // ou mais estrito:
+ tseslint.configs.strictTypeChecked,
+ // opcional — regras de estilo:
+ tseslint.configs.stylisticTypeChecked,
+ ],
+ languageOptions: {
+ parserOptions: {
+ project: ['./tsconfig.node.json', './tsconfig.app.json'],
+ tsconfigRootDir: import.meta.dirname,
+ },
+ },
+ },
 ])
 ```
 
@@ -86,19 +86,19 @@ import reactX from 'eslint-plugin-react-x'
 import reactDom from 'eslint-plugin-react-dom'
 
 export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      reactX.configs['recommended-typescript'],
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
+ globalIgnores(['dist']),
+ {
+ files: ['**/*.{ts,tsx}'],
+ extends: [
+ reactX.configs['recommended-typescript'],
+ reactDom.configs.recommended,
+ ],
+ languageOptions: {
+ parserOptions: {
+ project: ['./tsconfig.node.json', './tsconfig.app.json'],
+ tsconfigRootDir: import.meta.dirname,
+ },
+ },
+ },
 ])
 ```
