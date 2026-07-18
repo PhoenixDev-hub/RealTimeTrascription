@@ -3,10 +3,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#0A1E3F",
-        secondary: "#2563EB",
-        accent: "#F59E0B",
-        light: "#F8FAFC",
+        primary: "var(--color-primary)",
+        secondary: "var(--color-secondary)",
+        accent: "var(--color-accent)",
+        light: "var(--color-text-light)"
       }
     },
   },

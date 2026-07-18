@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #2F69B1;
+  --color-secondary: #25589B;
+  --color-background-dark: #04133B;
+  --color-text-light: #EDEDED;
+  --color-gray-mid: #A7A9BE;
+
+  --font-logo: 'Orbitron', sans-serif;
+  --font-ui: 'Exo 2', sans-serif;
+  --font-text: 'Inter', sans-serif;
+}
+
 div {
   background-color: transparent !important;
 }
@@ -21,6 +33,7 @@ div {
   animation: text-reveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
+/* Style do widget da VLibras */
 body [vw].enabled.vlibras-widget.vlibras-centered{
   position:fixed !important;
   top:50% !important;
