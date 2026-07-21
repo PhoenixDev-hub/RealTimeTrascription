@@ -64,7 +64,7 @@ export default function Problema() {
               }`}
             >
               <div className="mb-5 w-12 h-12 flex items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+                <Icon size={36} strokeWidth={1.75} aria-hidden="true" />
               </div>
               <h3 className="font-ui font-semibold text-text-light text-lg mb-3">{title}</h3>
               <p className="text-sm text-gray-mid leading-relaxed font-text">{text}</p>
