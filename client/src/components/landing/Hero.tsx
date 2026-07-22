@@ -20,7 +20,7 @@ const revealStyle = (delayMs: number): CSSProperties => ({ animationDelay: `${de
 
 export default function Hero() {
   return (
-    <section className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center text-center px-4 py-24 overflow-hidden bg-background-dark">
+    <section id="inicio" className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center text-center px-4 py-24 overflow-hidden bg-background-dark">
       <div
         className="absolute inset-0 bg-cover bg-center scale-110 blur-sm"
         style={{ backgroundImage: `url(${heroBg})` }}
@@ -61,14 +61,14 @@ export default function Hero() {
           className={`mt-10 flex flex-col sm:flex-row items-center gap-4 ${revealClass}`}
           style={revealStyle(300)}
         >
-          <Link
-            to="/solucao"
+          <a
+            href="#funcionamento"
             className="inline-flex items-center px-7 py-3.5 bg-gradient-to-r from-primary to-secondary text-text-light font-ui font-semibold tracking-wide rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:brightness-110 hover:scale-[1.02] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark"
           >
             Conheça a plataforma
-          </Link>
+          </a>
           <Link
-            to="/demonstracao"
+            to="/app"
             className="inline-flex items-center gap-2 px-7 py-3.5 text-text-light font-ui font-semibold tracking-wide rounded-full border border-text-light/20 hover:border-primary/60 hover:text-primary hover:scale-[1.02] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark"
           >
             <PlayCircle size={20} strokeWidth={1.75} aria-hidden="true" />

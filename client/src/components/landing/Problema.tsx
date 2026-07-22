@@ -30,7 +30,7 @@ export default function Problema() {
   const [gridRef, gridInView] = useInView<HTMLDivElement>({ threshold: 0.1 });
 
   return (
-    <section className="relative bg-background-dark px-4 py-24 overflow-hidden">
+    <section id="problema" className="relative bg-background-dark px-4 py-24 overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
       <div className="max-w-5xl mx-auto text-center">

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { MicVAD } from '@ricky0123/vad-web'
+import type { RNNoiseNode } from 'simple-rnnoise-wasm'
 import { WS_URL } from '../../config/backend'
 import { parseTranscriptMessage, type TranscriptMessage } from '../../services/websocket'
 
@@ -23,15 +25,15 @@ export function useAudioCapture({ onTranscript }: UseAudioCaptureOptions) {
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const rnnoiseNodeRef = useRef<any>(null)
+  const rnnoiseNodeRef = useRef<RNNoiseNode | null>(null)
   const encoderNodeRef = useRef<AudioWorkletNode | null>(null)
-  const vadRef = useRef<any>(null)
+  const vadRef = useRef<MicVAD | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const rtcPcRef = useRef<RTCPeerConnection | null>(null)
   const rtcDcRef = useRef<RTCDataChannel | null>(null)
   const speakingRef = useRef<boolean>(false)
-  const lastSendTimeRef = useRef<number>(Date.now())
+  const lastSendTimeRef = useRef<number>(0)
   const useVadGatingRef = useRef<boolean>(true)
   const reconnectTimerRef = useRef<number | null>(null)
 
@@ -300,16 +302,20 @@ export function useAudioCapture({ onTranscript }: UseAudioCaptureOptions) {
       updateLevel()
 
       setCapturing(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Falha ao iniciar captura de áudio:', error)
-      if (error.name === 'NotAllowedError' || error.message?.includes('Permission denied')) {
+      const audioException = error instanceof DOMException ? error : null
+      const errorName = audioException?.name ?? 'Error'
+      const errorMessage = error instanceof Error ? error.message : 'Falha desconhecida'
+
+      if (errorName === 'NotAllowedError' || errorMessage.includes('Permission denied')) {
         setAudioError('Permissão negada. Conceda acesso ao microfone nas configurações do navegador.')
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
         setAudioError('Microfone não encontrado. Conecte um dispositivo de entrada.')
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
         setAudioError('Microfone ocupado por outra aplicação.')
       } else {
-        setAudioError(`Erro no áudio: ${error.message || error.name}`)
+        setAudioError(`Erro no áudio: ${errorMessage || errorName}`)
       }
     }
   }
@@ -355,6 +361,8 @@ export function useAudioCapture({ onTranscript }: UseAudioCaptureOptions) {
         wsRef.current.close()
       }
     }
+    // Conecta uma vez no mount; recriar pela identidade da função reinicia o socket.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const selectDevice = (deviceId: string) => {

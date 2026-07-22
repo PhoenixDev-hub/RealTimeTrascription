@@ -1,22 +1,18 @@
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 interface NavItem {
   label: string;
   href: string;
 }
 
-interface NavLinkState {
-  isActive: boolean;
-}
-
 const navItems: NavItem[] = [
-  { label: 'Início', href: '/' },
-  { label: 'Problema', href: '/problema' },
-  { label: 'Solução', href: '/solucao' },
-  { label: 'Tecnologias', href: '/tecnologias' },
-  { label: 'Impacto', href: '/impacto' },
+  { label: 'Início', href: '#inicio' },
+  { label: 'Problema', href: '#problema' },
+  { label: 'Funcionamento', href: '#funcionamento' },
+  { label: 'Tecnologias', href: '#tecnologias' },
+  { label: 'Impacto', href: '#impacto' },
 ];
 
 export default function Header() {
@@ -29,17 +25,10 @@ export default function Header() {
     };
   }, [mobileOpen]);
 
-  const linkClass = ({ isActive }: NavLinkState): string =>
-    `relative font-ui text-sm tracking-wide py-1 transition-colors after:absolute after:left-0 after:-bottom-0.5 after:h-px after:bg-primary after:transition-all after:duration-300 ${
-      isActive
-        ? 'text-primary after:w-full'
-        : 'text-text-light/80 hover:text-primary after:w-0 hover:after:w-full'
-    }`;
+  const linkClass =
+    'relative font-ui text-sm tracking-wide py-1 text-text-light/80 hover:text-primary transition-colors after:absolute after:left-0 after:-bottom-0.5 after:h-px after:bg-primary after:w-0 after:transition-all after:duration-300 hover:after:w-full';
 
-  const mobileLinkClass = ({ isActive }: NavLinkState): string =>
-    `block px-2 py-1 text-sm tracking-wide transition-colors ${
-      isActive ? 'text-primary' : 'text-text-light/80 hover:text-primary'
-    }`;
+  const mobileLinkClass = 'block px-2 py-1 text-sm tracking-wide text-text-light/80 hover:text-primary transition-colors';
 
   return (
     <header className="relative bg-background-dark sticky top-0 z-50 motion-safe:opacity-0 motion-safe:animate-[fadeInDown_0.5s_ease-out_forwards]">
@@ -54,19 +43,19 @@ export default function Header() {
 
           <nav className="hidden md:flex items-center space-x-8" aria-label="Navegação principal">
             {navItems.map((item) => (
-              <NavLink key={item.label} to={item.href} className={linkClass}>
+              <a key={item.label} href={item.href} className={linkClass}>
                 {item.label}
-              </NavLink>
+              </a>
             ))}
             <div className="flex items-center space-x-3 ml-4">
               <Link
-                to="/entrar"
+                to="/app"
                 className="px-4 py-2 font-ui text-sm font-medium tracking-wide text-primary hover:text-primary/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full"
               >
                 Entrar
               </Link>
               <Link
-                to="/cadastrar"
+                to="/app"
                 className="px-5 py-2 font-ui text-sm font-semibold tracking-wide text-text-light bg-gradient-to-r from-primary to-secondary rounded-full hover:brightness-110 hover:scale-[1.03] transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark"
               >
                 Cadastrar
@@ -93,25 +82,25 @@ export default function Header() {
         >
           <nav className="border-t border-primary/10 py-5 space-y-4 font-ui" aria-label="Navegação mobile">
             {navItems.map((item) => (
-              <NavLink
+              <a
                 key={item.label}
-                to={item.href}
+                href={item.href}
                 className={mobileLinkClass}
                 onClick={() => setMobileOpen(false)}
               >
                 {item.label}
-              </NavLink>
+              </a>
             ))}
             <div className="flex flex-col space-y-2 pt-3 border-t border-primary/10">
               <Link
-                to="/entrar"
+                to="/app"
                 className="px-4 py-2 text-center text-sm text-primary hover:text-primary/80"
                 onClick={() => setMobileOpen(false)}
               >
                 Entrar
               </Link>
               <Link
-                to="/cadastrar"
+                to="/app"
                 className="px-4 py-2 text-center text-sm font-semibold text-text-light bg-gradient-to-r from-primary to-secondary rounded-full hover:brightness-110 transition-all"
                 onClick={() => setMobileOpen(false)}
               >

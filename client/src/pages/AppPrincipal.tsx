@@ -121,17 +121,14 @@ export default function AppPrincipal() {
 
     if (cleanCurrent === cleanSent) return
 
-    let newPart = ''
-    if (cleanCurrent.startsWith(cleanSent)) {
-      newPart = cleanCurrent.substring(cleanSent.length).trim()
-    } else {
-      newPart = cleanCurrent
-    }
+    const newPart = cleanCurrent.startsWith(cleanSent)
+      ? cleanCurrent.substring(cleanSent.length).trim()
+      : cleanCurrent
 
     if (!newPart) return
 
     // Pausa natural
-    const endsWithPause = /[.,\/#!$%\^&\*;:{}=\-_`~()?]/.test(newPart.slice(-1))
+    const endsWithPause = /[.,/#!$%^&*;:{}=_`~()?-]/.test(newPart.slice(-1))
 
     if (endsWithPause) {
       setTextoEnviadoAoVLibras(cleanCurrent)
