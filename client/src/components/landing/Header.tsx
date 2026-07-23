@@ -49,13 +49,13 @@ export default function Header() {
             ))}
             <div className="flex items-center space-x-3 ml-4">
               <Link
-                to="/app"
+                to="/entrar"
                 className="px-4 py-2 font-ui text-sm font-medium tracking-wide text-primary hover:text-primary/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full"
               >
                 Entrar
               </Link>
               <Link
-                to="/app"
+                to="/cadastrar"
                 className="px-5 py-2 font-ui text-sm font-semibold tracking-wide text-text-light bg-gradient-to-r from-primary to-secondary rounded-full hover:brightness-110 hover:scale-[1.03] transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-dark"
               >
                 Cadastrar
@@ -93,14 +93,14 @@ export default function Header() {
             ))}
             <div className="flex flex-col space-y-2 pt-3 border-t border-primary/10">
               <Link
-                to="/app"
+                to="/entrar"
                 className="px-4 py-2 text-center text-sm text-primary hover:text-primary/80"
                 onClick={() => setMobileOpen(false)}
               >
                 Entrar
               </Link>
               <Link
-                to="/app"
+                to="/cadastrar"
                 className="px-4 py-2 text-center text-sm font-semibold text-text-light bg-gradient-to-r from-primary to-secondary rounded-full hover:brightness-110 transition-all"
                 onClick={() => setMobileOpen(false)}
               >

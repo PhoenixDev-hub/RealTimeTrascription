@@ -12,9 +12,6 @@
   --font-text: 'Inter', sans-serif;
 }
 
-div {
-  background-color: transparent !important;
-}
 
 @keyframes text-reveal {
   0% {
@@ -40,6 +37,10 @@ div {
 
 .animate-text-reveal {
   animation: text-reveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+div {
+  background-color: transparent !important;
 }
 
 /* Style do widget da VLibras */

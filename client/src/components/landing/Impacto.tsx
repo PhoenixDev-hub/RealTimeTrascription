@@ -118,7 +118,7 @@ export default function Impacto() {
             Lorem ipsum dolor sit amet, consectetur adipiscing elit.
           </p>
           <Link
-            to="/app"
+            to="/cadastrar"
             className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-background-dark text-text-light font-ui font-semibold tracking-wide rounded-full hover:scale-[1.03] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-light focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             Cadastre-se gratuitamente

@@ -1,4 +1,4 @@
-import { Briefcase, Camera, Code, Mail } from 'lucide-react';
+import { Code } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface FooterLink {
@@ -13,18 +13,8 @@ const productLinks: FooterLink[] = [
   { label: 'Impacto', href: '#impacto' },
 ];
 
-const companyLinks: FooterLink[] = [
-  { label: 'Sobre nós', href: '#impacto' },
-  { label: 'Contato', href: 'mailto:contato@duallibras.ai' },
-  { label: 'Privacidade', href: '#inicio' },
-  { label: 'Termos de uso', href: '#inicio' },
-];
-
 const socialLinks = [
   { icon: Code, label: 'GitHub', href: 'https://github.com' },
-  { icon: Briefcase, label: 'LinkedIn', href: 'https://linkedin.com' },
-  { icon: Camera, label: 'Instagram', href: 'https://instagram.com' },
-  { icon: Mail, label: 'E-mail', href: 'mailto:contato@duallibras.ai' },
 ];
 
 export default function Footer() {
@@ -35,7 +25,7 @@ export default function Footer() {
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-12">
           {/* Marca */}
           <div>
             <Link
@@ -70,25 +60,6 @@ export default function Footer() {
             </h4>
             <ul className="space-y-3">
               {productLinks.map((item) => (
-                <li key={item.label}>
-                  <a
-                    href={item.href}
-                    className="text-sm text-gray-mid hover:text-primary transition-colors font-text"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Empresa */}
-          <div>
-            <h4 className="font-ui font-semibold text-text-light text-sm uppercase tracking-wide mb-4">
-              Empresa
-            </h4>
-            <ul className="space-y-3">
-              {companyLinks.map((item) => (
                 <li key={item.label}>
                   <a
                     href={item.href}
