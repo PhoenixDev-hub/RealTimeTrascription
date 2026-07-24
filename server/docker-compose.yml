@@ -1,0 +1,22 @@
+services:
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    ports:
+      - "8000:5455"
+    networks:
+      - server-network
+
+  auth:
+    build:
+      context: ./auth
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    networks:
+      - server-network
+
+networks:
+  server-network:
+    driver: bridge

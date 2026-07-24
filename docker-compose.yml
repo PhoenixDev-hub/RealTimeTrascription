@@ -3,7 +3,7 @@ version: '3.9'
 services:
   backend:
     build:
-      context: ./server
+      context: ./server/ai
       dockerfile: Dockerfile
     container_name: duallibras-backend
     ports:
@@ -26,7 +26,7 @@ services:
       - LOG_LEVEL=INFO
       - PORT=5455
     volumes:
-      - ./server/transcripts:/app/transcripts
+      - ./server/ai/transcripts:/app/transcripts
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5455/health', timeout=5)"]
       interval: 30s

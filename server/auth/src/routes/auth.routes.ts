@@ -1,0 +1,1 @@
+// Defines authentication route bindings.
